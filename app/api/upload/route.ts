@@ -1,51 +1,56 @@
 // app/api/upload/route.ts
 import { NextResponse } from 'next/server';
+import { v2 as cloudinary } from 'cloudinary';
 
-export async function POST(req: Request) {
+// Konfigurasi Cloudinary
+cloudinary.config({
+  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+export async function POST(request: Request) {
   try {
-    const formData = await req.formData();
+    const formData = await request.formData();
     const file = formData.get('file') as File;
 
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    // 1. Persiapan Data
+    // Konversi File ke Buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const base64Image = buffer.toString('base64');
 
-    // 2. Kirim ke ImgBB
-    const imgBBFormData = new FormData();
-    imgBBFormData.append('key', process.env.IMGBB_API_KEY!);
-    imgBBFormData.append('image', base64Image);
-    imgBBFormData.append('name', `STRUK-${Date.now()}`); // Opsional: Nama file di ImgBB
-
-    // Panggil API Eksternal
-    const response = await fetch('https://api.imgbb.com/1/upload', {
-      method: 'POST',
-      body: imgBBFormData,
+    // Upload ke Cloudinary menggunakan Stream
+    // Kita bungkus dalam Promise agar bisa di-await
+    const uploadResponse: any = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'pos-toko-luwes', // Nama folder di Cloudinary (Opsional)
+          resource_type: 'auto',   // Otomatis deteksi jpg/png
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      
+      // Akhiri stream dengan buffer file kita
+      uploadStream.end(buffer);
     });
 
-    const result = await response.json();
-
-    // 3. Cek Error dari ImgBB
-    if (!result.success) {
-      throw new Error(result.error?.message || 'Gagal upload ke ImgBB');
-    }
-
-    // 4. Ambil Link
-    // data.url = Link gambar asli (besar)
-    // data.display_url = Link gambar yang aman untuk display
-    const fileUrl = result.data.url; 
-
-    return NextResponse.json({ 
-        success: true, 
-        fileUrl: fileUrl 
+    // Sukses! Kembalikan URL HTTPS yang aman
+    return NextResponse.json({
+      success: true,
+      fileUrl: uploadResponse.secure_url, // URL HTTPS Cloudinary
     });
 
   } catch (error: any) {
     console.error('Upload Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Something went wrong' },
+      { status: 500 }
+    );
   }
 }

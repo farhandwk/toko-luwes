@@ -6,22 +6,21 @@ import { Product } from '@/types';
 import ProductCard from '@/components/ProductCard';
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import CartDrawer from '@/components/CartDrawer';
+import CartDrawer from '@/components/CartDrawer'; 
 import { useCartStore } from '@/hooks/useCart';
-import { Input } from '@/components/ui/input'; // Import Input Shadcn
-import { Search, X } from 'lucide-react'; // Icon
-import { Button } from '@/components/ui/button'; // Kita pakai button untuk kategori
-import { History, Settings } from 'lucide-react'
-import { signOut } from '@/auth';
+import { Input } from '@/components/ui/input'; 
+import { Search, X, History, Settings } from 'lucide-react'; 
+import { Button } from '@/components/ui/button';
+
+// [PERBAIKAN] Pastikan path ini benar sesuai struktur folder kamu.
+// Jika file ada di folder 'config' sejajar dengan 'app', gunakan '@/config/categories'
+import { PRODUCT_CATEGORIES } from '../types/categories'; 
 
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // STATE BARU: PENCARIAN & FILTER
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Semua");
-
   const { addItem } = useCartStore();
 
   const fetchProducts = async () => {
@@ -38,109 +37,45 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+  useEffect(() => { fetchProducts(); }, []);
 
-  // LOGIKA 1: AMBIL DAFTAR KATEGORI UNIK
-  // Otomatis mencari kategori apa saja yang ada di database (misal: Makanan, Minuman, Snack)
-  const categories = useMemo(() => {
-    const uniqueCategories = new Set(products.map((p) => p.category));
-    return ["Semua", ...Array.from(uniqueCategories)];
-  }, [products]);
-
-  // LOGIKA 2: FILTER PRODUK
+  // Filter Logic
   const filteredProducts = products.filter((product) => {
-    // Cek apakah nama produk cocok dengan pencarian? (Case insensitive)
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    // Cek apakah kategori cocok?
     const matchesCategory = selectedCategory === "Semua" || product.category === selectedCategory;
-
     return matchesSearch && matchesCategory;
   });
 
   const handleAddToCart = (product: Product) => {
     addItem(product);
-    toast.success(`${product.name} masuk keranjang`, {
-        duration: 1000, 
-    });
+    toast.success(`${product.name} +1`, { duration: 1000 });
   };
 
   return (
     <main className="min-h-screen bg-slate-50 pb-20">
-      {/* HEADER + SEARCH BAR */}
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b shadow-sm">
-        <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-4">
-            {/* Baris 1: Judul & Keranjang */}
+      {/* HEADER TETAP SAMA */}
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b shadow-sm">
+        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold text-slate-900">Kasir Toko</h1>
-                    <p className="text-xs text-slate-500">Point of Sales System</p>
+                    <h1 className="text-xl md:text-2xl font-bold text-slate-900">Toko Luwes</h1>
+                    <p className="text-xs text-slate-500">Kasir Point of Sales</p>
                 </div>
-                
                 <div className="flex items-center gap-2">
-                  <Link href="/transactions">
-                        <Button variant="ghost" size="icon" title="Riwayat Transaksi" className='cursor-pointer'>
-                            <History className="h-5 w-5 text-slate-600" />
-                        </Button>
-                    </Link>
-
-                  <Link href="/admin/products">
-                        <Button variant="ghost" size="icon" title="Manajemen Produk" className='cursor-pointer'>
-                            <Settings className="h-5 w-5 text-slate-600" />
-                        </Button>
-                    </Link>
-
-                    <button 
-                        onClick={fetchProducts} 
-                        className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
-                        title="Refresh Data"
-                    >
-                    ⟳
-                    </button>
-                    <CartDrawer onCheckoutSuccess={fetchProducts} />
-                    {/* <form
-                    action={async () => {
-                      'use server';
-                      await signOut({ redirectTo: '/' })
-                    }}>
-                      <button className='text-slate-100 transition-all font-semibold bg-red-600 hover:bg-red-800 w-auto h-auto border-2 border-solid border-red-600 hover:border-red-800 text-sm px-4 py-2 rounded-[10] cursor-pointer'>
-                        Log Out
-                      </button>
-                    </form> */}
+                    <Link href="/transactions"><Button variant="ghost" size="icon"><History className="h-5 w-5 text-slate-600" /></Button></Link>
+                    <Link href="/admin/products"><Button variant="ghost" size="icon"><Settings className="h-5 w-5 text-slate-600" /></Button></Link>
                 </div>
             </div>
-
-            {/* Baris 2: Search Bar */}
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input 
-                    placeholder="Cari nama produk (contoh: Kopi)..." 
-                    className="pl-9 bg-slate-50 border-slate-200 focus-visible:ring-primary"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {searchQuery && (
-                    <button 
-                        onClick={() => setSearchQuery("")}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500"
-                    >
-                        <X className="h-4 w-4" />
-                    </button>
-                )}
+                <Input placeholder="Cari produk..." className="pl-9 bg-slate-50" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                {searchQuery && (<button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X className="h-4 w-4" /></button>)}
             </div>
-
-            {/* Baris 3: Kategori Pills (Scrollable Horizontal) */}
             <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-                {categories.map((cat) => (
-                    <Button
-                        key={cat}
-                        variant={selectedCategory === cat ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setSelectedCategory(cat)}
-                        className={`rounded-full px-4 text-xs ${selectedCategory === cat ? 'bg-primary' : 'border-slate-300 text-slate-600'}`}
-                    >
+                <Button variant={selectedCategory === "Semua" ? "default" : "outline"} size="sm" onClick={() => setSelectedCategory("Semua")} className="rounded-full px-4 text-xs">Semua</Button>
+                {/* [PERBAIKAN] Mapping dari PRODUCT_CATEGORIES yang diimport */}
+                {PRODUCT_CATEGORIES.map((cat) => (
+                    <Button key={cat} variant={selectedCategory === cat ? "default" : "outline"} size="sm" onClick={() => setSelectedCategory(cat)} className="rounded-full px-4 text-xs whitespace-nowrap">
                         {cat}
                     </Button>
                 ))}
@@ -148,36 +83,36 @@ export default function Home() {
         </div>
       </header>
 
-      {/* PRODUCT GRID */}
-      <div className="p-4 md:p-6 max-w-6xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {loading ? (
-            // Skeleton Loading
-            Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex flex-col space-y-3">
-                <Skeleton className="h-[125px] w-full rounded-xl" />
-                <div className="space-y-2">
-                    <Skeleton className="h-4 w-[250px]" />
-                    <Skeleton className="h-4 w-[200px]" />
+      {/* MAIN CONTENT */}
+      <div className="max-w-7xl mx-auto p-4 md:p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            
+            {/* KOLOM PRODUK */}
+            <div className="lg:col-span-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pb-24 lg:pb-0">
+                    {loading ? Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full rounded-xl" />) 
+                    : filteredProducts.length > 0 ? filteredProducts.map((p) => <ProductCard key={p.id} product={p} onAddToCart={handleAddToCart} />) 
+                    : <div className="col-span-full py-20 text-center text-slate-400">Produk tidak ditemukan</div>}
                 </div>
-                </div>
-            ))
-            ) : filteredProducts.length > 0 ? (
-                // Render Hasil Filter
-                filteredProducts.map((product) => (
-                    <ProductCard 
-                    key={product.id} 
-                    product={product} 
-                    onAddToCart={handleAddToCart} 
+            </div>
+
+            {/* KOLOM CART (SIDEBAR) */}
+            <div className="hidden lg:block lg:col-span-1">
+                {/* [PERBAIKAN] Sticky Top disesuaikan, dan Height dikurangi agar tombol bayar terlihat */}
+                <div className="sticky top-24 z-10"> 
+                    <CartDrawer 
+                        onCheckoutSuccess={fetchProducts} 
+                        // Height = Layar Penuh - Header (sekitar 180px)
+                        className="shadow-lg border rounded-xl overflow-hidden bg-white h-[calc(100vh-140px)]"
                     />
-                ))
-            ) : (
-                // Tampilan Jika Tidak Ada Hasil
-                <div className="col-span-full py-10 text-center text-slate-500">
-                    <p className="text-lg font-medium">Produk tidak ditemukan</p>
-                    <p className="text-sm">Coba kata kunci lain atau ganti kategori.</p>
                 </div>
-            )}
+            </div>
+
+            {/* CART MOBILE */}
+            <div className="lg:hidden">
+                <CartDrawer onCheckoutSuccess={fetchProducts} />
+            </div>
+
         </div>
       </div>
     </main>

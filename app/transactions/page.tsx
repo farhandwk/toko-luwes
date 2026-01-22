@@ -286,9 +286,9 @@ export default function TransactionsPage() {
                                                 </DialogHeader>
                                                 <div className="flex justify-center p-4 bg-slate-50 rounded-lg border border-dashed border-slate-300">
                                                     <img 
-                                                        src={`/api/image-proxy?url=${encodeURIComponent(trx.proofLink)}`} 
+                                                        src={trx.proofLink} 
                                                         alt="Struk Belanja" 
-                                                        className="w-full h-auto object-contain shadow-sm bg-white"
+                                                        className="w-full h-auto object-contain shadow-md"
                                                     />
                                                 </div>
                                                 <div className="flex justify-center pt-2">

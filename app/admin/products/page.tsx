@@ -23,9 +23,18 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { 
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+ } from "@/components/ui/select"
+import { 
   Loader2, Plus, Pencil, Trash2, ArrowLeft, Image as ImageIcon, Save 
 } from 'lucide-react';
 import { toast } from "sonner";
+
+import { PRODUCT_CATEGORIES } from '@/types/categories';
 
 // Tipe Data Produk
 interface Product {
@@ -218,7 +227,7 @@ export default function AdminProductsPage() {
                     <TableRow>
                         <TableHead className="w-[80px]">Gambar</TableHead>
                         <TableHead>Nama Produk</TableHead>
-                        <TableHead className="hidden md:table-cell">Kategori</TableHead>
+                        <TableHead className="table-cell">Kategori</TableHead>
                         <TableHead>Harga</TableHead>
                         <TableHead>Stok</TableHead>
                         <TableHead className="text-right">Aksi</TableHead>
@@ -239,8 +248,7 @@ export default function AdminProductsPage() {
                                 <div className="h-10 w-10 bg-slate-100 rounded-md overflow-hidden relative">
                                     {product.image ? (
                                         <img 
-                                            // Pakai Proxy Image biar aman dari blokir
-                                            src={`/api/image-proxy?url=${encodeURIComponent(product.image)}`} 
+                                            src={product.image || 'https://api.escuelajs.co/api/v1/products'} 
                                             alt={product.name}
                                             className="h-full w-full object-cover"
                                         />
@@ -250,7 +258,7 @@ export default function AdminProductsPage() {
                                 </div>
                             </TableCell>
                             <TableCell className="font-medium">{product.name}</TableCell>
-                            <TableCell className="hidden md:table-cell">
+                            <TableCell className="table-cell">
                                 <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-full text-xs">
                                     {product.category}
                                 </span>
@@ -318,7 +326,22 @@ export default function AdminProductsPage() {
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="category" className="text-right">Kategori</Label>
-                        <Input id="category" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="col-span-3" placeholder="Contoh: Makanan" required />
+                        {/* <Input id="category" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="col-span-3" placeholder="Contoh: Makanan" required /> */}
+                        <div>
+                            <Select
+                            value={formData.category}
+                            onValueChange={(value) => setFormData({ ...formData, category: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder='Pilih Kategori'/>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    { PRODUCT_CATEGORIES.map((item) => (
+                                        <SelectItem key={item} value={item}>{item}</SelectItem>
+                                    )) }
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="price" className="text-right">Harga</Label>

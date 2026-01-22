@@ -31,13 +31,13 @@ export default function LoginForm() {
   return (
     <Card className="w-full shadow-lg border-slate-200">
       <CardHeader className="space-y-1 text-center">
-        <CardTitle className="text-2xl font-bold text-primary">Login Kasir</CardTitle>
+        <CardTitle className="text-2xl font-bold text-primary">Login</CardTitle>
         <CardDescription>
           Masukkan akun untuk mengakses dashboard
         </CardDescription>
       </CardHeader>
       
-      <form action={formAction}>
+      <form action={formAction} className="grid gap-6">
         <CardContent className="grid gap-4">
           
           {/* Alert Error (Muncul jika ada error) */}
