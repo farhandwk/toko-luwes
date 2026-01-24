@@ -90,8 +90,10 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     reader.onloadend = () => {
         const base64data = reader.result as string;
         const cleanBase64 = base64data.split(',')[1];
-        // Deep Link ke Aplikasi RawBT
-        const rawbtUrl = `rawbt:base64,${cleanBase64}`;
+        
+        // [PERBAIKAN] Tambahkan 'data:image/png;base64,' agar RawBT tahu ini GAMBAR
+        const rawbtUrl = `rawbt:data:image/png;base64,${cleanBase64}`;
+        
         window.location.href = rawbtUrl;
     };
   };
