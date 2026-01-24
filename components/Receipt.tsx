@@ -25,7 +25,7 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ items, total, date, 
       {/* Header */}
       <div className="text-center mb-2">
         <h2 className="font-bold text-sm uppercase">Toko Luwes</h2>
-        <p className="text-[9px]">Jl. Contoh No. 123, Yogyakarta</p>
+        <p className="text-[9px]">Jl. Pacarmulyo, Gondang, Watumalang, Wonsobo</p>
         <p className="text-[9px] mt-1">{date}</p>
         <p className="text-[9px]">ID: {id}</p>
       </div>
