@@ -17,15 +17,18 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogHeader, // Import Header
-  DialogTitle,  // Import Title (SOLUSI ERROR MOBILE)
+  DialogHeader,
+  DialogTitle,
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog"; 
 import { Separator } from '@/components/ui/separator';
-import { Trash2, ShoppingCart, Plus, Minus, Loader2, Send, Share2, Download, Info } from 'lucide-react'; 
+// Import Icon Printer
+import { Trash2, ShoppingCart, Plus, Minus, Loader2, Send, Share2, Download, Info, Printer } from 'lucide-react'; 
 import { toast } from "sonner";
 import { toPng } from 'html-to-image';
+// Import Print Utility
+import { useReactToPrint } from 'react-to-print'; 
 import Receipt from './Receipt';
 
 interface CartDrawerProps {
@@ -68,6 +71,30 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
         date: getWIBDate()
     });
   }, [isOpen]);
+
+  // --- FUNGSI PRINT PC (USB) ---
+  const handlePrintPC = useReactToPrint({
+    contentRef: receiptRef,
+    documentTitle: `Struk-${lastTxId}`,
+    onAfterPrint: () => toast.success("Perintah cetak dikirim!"),
+  });
+
+  // --- FUNGSI PRINT HP (BLUETOOTH / RAWBT) ---
+  const handlePrintMobile = () => {
+    if (!receiptBlob) {
+        toast.error("Sedang memproses gambar struk...");
+        return;
+    }
+    const reader = new FileReader();
+    reader.readAsDataURL(receiptBlob);
+    reader.onloadend = () => {
+        const base64data = reader.result as string;
+        const cleanBase64 = base64data.split(',')[1];
+        // Deep Link ke Aplikasi RawBT
+        const rawbtUrl = `rawbt:base64,${cleanBase64}`;
+        window.location.href = rawbtUrl;
+    };
+  };
 
   const handleDownloadImage = () => {
     if (!receiptBlob) { toast.error("Struk belum siap"); return; }
@@ -113,13 +140,13 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
         try {
           await new Promise(resolve => setTimeout(resolve, 100));
           
-          // [FIX] Menggunakan skipFonts untuk mengatasi error 'font is undefined'
+          // [FIX] Mengatasi Error Font & Cloudinary
           const dataUrl = await toPng(receiptRef.current, { 
              cacheBust: true, 
              backgroundColor: '#ffffff',
-             filter: (node) => (node.tagName !== 'LINK'), // Abaikan tag font eksternal
+             filter: (node) => (node.tagName !== 'LINK'), // Skip font links
              // @ts-ignore
-             skipFonts: true, // Matikan font embedding yang bikin error
+             skipFonts: true, // Matikan font embedding
           });
 
           const res = await fetch(dataUrl);
@@ -161,8 +188,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     } finally { setIsLoading(false); }
   };
 
-  // --- COMPONENT ISI KERANJANG (TANPA HEADER) ---
-  const CartContentUI = () => (
+  // --- UI ISI KERANJANG (Shared Component) ---
+  const cartContent = (
     <div className="flex flex-col h-full overflow-hidden">
         {/* List Item */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
@@ -218,6 +245,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                         value={cashReceived} 
                         onChange={(e) => setCashReceived(Number(e.target.value))} 
                         className="text-right text-lg font-mono font-bold" 
+                        autoFocus={false} // Pastikan autofocus false agar tidak lompat
                     />
                 </div>
             )}
@@ -238,7 +266,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
   return (
     <div className={className}>
       
-      {/* MODE MOBILE (TOMBOL FLOATING + DIALOG) */}
+      {/* MODE MOBILE */}
       <div className="lg:hidden"> 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <div className='fixed bottom-6 left-0 w-full flex justify-center z-40 px-4'>
@@ -256,32 +284,36 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
             </div>
             
             <DialogContent className="sm:max-w-lg w-[95%] rounded-xl flex flex-col max-h-[85vh] p-0 gap-0 overflow-hidden">
-                {/* [SOLUSI] Header dipindah ke sini dan pakai DialogTitle agar valid */}
                 <DialogHeader className="p-4 border-b bg-slate-50">
                     <DialogTitle className="font-bold flex items-center gap-2 text-base">
                         <ShoppingCart className="h-5 w-5" /> Keranjang Belanja
                     </DialogTitle>
                 </DialogHeader>
 
-                <CartContentUI />
+                {/* PANGGIL VARIABEL DI SINI (BUKAN COMPONENT) */}
+                {cartContent} 
+
             </DialogContent>
         </Dialog>
       </div>
 
-      {/* MODE DESKTOP (TAMPIL LANGSUNG DI SIDEBAR) */}
+      {/* MODE DESKTOP */}
       <div className="hidden lg:flex flex-col h-full bg-white rounded-xl overflow-hidden border">
-          {/* Header Desktop (Pakai Div Biasa) */}
           <div className="p-4 border-b bg-slate-50">
             <h2 className="font-bold flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5" /> Keranjang Belanja
             </h2>
           </div>
-          <CartContentUI />
+          
+          {/* PANGGIL VARIABEL DI SINI JUGA */}
+          {cartContent}
+          
       </div>
 
-      {/* DIALOG SUKSES (SAMA) */}
+      {/* ... Dialog Sukses & Receipt tetap sama ... */}
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent className="sm:max-w-md w-[90%] rounded-xl">
+          {/* ... isi dialog sukses tidak berubah ... */}
+           <DialogContent className="sm:max-w-md w-[90%] rounded-xl">
             <DialogHeader>
                 <DialogTitle className="text-center flex flex-col items-center gap-2">
                     <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center text-green-600 animate-in zoom-in">
@@ -290,26 +322,62 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                     Transaksi Berhasil!
                 </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-2">
+            
+            <div className="space-y-3 py-2">
+                {/* 1. INPUT WA */}
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                     <Label className="text-xs text-slate-500 mb-1.5 block">Nomor WhatsApp Pelanggan</Label>
                     <div className="flex gap-2">
                         <Input placeholder="08xxxxxxxxxx" value={manualPhone} onChange={(e) => setManualPhone(e.target.value)} className="bg-white" />
-                        <Button variant="outline" onClick={handleDownloadImage} title="Download Gambar Struk" className="border-slate-300 hover:bg-slate-100">
+                        <Button variant="outline" onClick={handleDownloadImage} title="Download" className="border-slate-300 hover:bg-slate-100">
                             <Download className="h-4 w-4 text-slate-700" />
                         </Button>
                     </div>
                 </div>
-                <Button className="w-full h-12 bg-green-600 hover:bg-green-700 shadow-md" onClick={handleOpenWhatsApp}>
-                    <Share2 className="h-5 w-5 mr-2" /> Buka WhatsApp
-                </Button>
+
+                {/* 2. GRID TOMBOL AKSI */}
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                    {/* CETAK PC */}
+                    <Button 
+                        variant="outline" 
+                        className="flex flex-col items-center justify-center h-16 gap-1 border-slate-300 hidden md:flex"
+                        onClick={() => handlePrintPC()}
+                    >
+                        <Printer className="h-5 w-5 text-slate-700" />
+                        <span className="text-xs font-normal">Cetak (USB)</span>
+                    </Button>
+
+                    {/* CETAK HP (BLUETOOTH) */}
+                    <Button 
+                        variant="outline" 
+                        className="flex flex-col items-center justify-center h-16 gap-1 border-slate-300 md:hidden"
+                        onClick={handlePrintMobile}
+                    >
+                        <Printer className="h-5 w-5 text-slate-700" />
+                        <span className="text-xs font-normal">Cetak (BT)</span>
+                    </Button>
+                    
+                    {/* KIRIM WA */}
+                    <Button 
+                        className="flex flex-col items-center justify-center h-16 gap-1 bg-green-600 hover:bg-green-700 col-span-2 md:col-span-1"
+                        onClick={handleOpenWhatsApp}
+                    >
+                        <Share2 className="h-5 w-5" />
+                        <span className="text-xs font-normal">Kirim WA</span>
+                    </Button>
+                </div>
             </div>
+
             <DialogFooter className="sm:justify-center">
-                <Button variant="ghost" onClick={() => { setShowSuccessDialog(false); setIsOpen(false); }}>Tutup</Button>
+                <Button variant="ghost" onClick={() => { setShowSuccessDialog(false); setIsOpen(false); }}>
+                    Tutup
+                </Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
-      <div style={{ position: 'fixed', top: 0, left: '-9999px', zIndex: -50 }}><Receipt ref={receiptRef} items={items} total={total} date={receiptData.date} id={receiptData.id} /></div>
+      <div style={{ position: 'fixed', top: 0, left: '-9999px', zIndex: -50 }}>
+        <Receipt ref={receiptRef} items={items} total={total} date={receiptData.date} id={receiptData.id} />
+      </div>
     </div>
   );
 };

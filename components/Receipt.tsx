@@ -1,85 +1,90 @@
-// components/Receipt.tsx
 import React, { forwardRef } from 'react';
-import { CartItem } from '@/hooks/useCart';
 import { formatRupiah } from '@/utils/currency';
 
 interface ReceiptProps {
-  items: CartItem[];
+  items: any[];
   total: number;
   date: string;
   id: string;
 }
 
 const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ items, total, date, id }, ref) => {
-  // Style Dasar Text
-  const textStyle = {
-    color: '#000000', // Hitam Pekat (Hex)
-    fontFamily: 'monospace',
-    fontSize: '12px',
-    lineHeight: '1.2',
-  };
-
-  const borderStyle = {
-    borderBottom: '1px dashed #000000',
-    marginBottom: '8px',
-    paddingBottom: '8px',
-  };
-
   return (
+    // Container Utama: Lebar 58mm, Font Monospace (seperti mesin ketik), Background Putih
     <div 
       ref={ref} 
-      style={{
-        backgroundColor: '#ffffff', // Putih Pekat
-        padding: '20px',
-        width: '300px', // Paksa text hitam di container utama
-        ...textStyle // Spread style dasar
+      className="bg-white text-black p-2"
+      style={{ 
+        width: '58mm', // Ukuran kertas thermal 58mm
+        minHeight: '100mm', // Tinggi minimal agar tidak terpotong
+        fontFamily: "'Courier New', Courier, monospace", // Font struk klasik
+        fontSize: '10px', // Ukuran font kecil agar muat
+        lineHeight: '1.2'
       }}
     >
       {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0, color: '#000000' }}>POS TOKO LUWES</h2>
-        <p style={{ margin: '4px 0', color: '#000000' }}>Jalan Kaliurang KM 5</p>
-        <p style={{ margin: 0, color: '#000000' }}>Yogyakarta</p>
+      <div className="text-center mb-2">
+        <h2 className="font-bold text-sm uppercase">Toko Luwes</h2>
+        <p className="text-[9px]">Jl. Contoh No. 123, Yogyakarta</p>
+        <p className="text-[9px] mt-1">{date}</p>
+        <p className="text-[9px]">ID: {id}</p>
       </div>
 
-      {/* Info Transaksi */}
-      <div style={borderStyle}>
-        <p style={{ margin: 0, color: '#000000' }}>No: {id}</p>
-        <p style={{ margin: 0, color: '#000000' }}>Tgl: {date}</p>
-        <p style={{ margin: 0, color: '#000000' }}>Waktu: {date}</p>
-      </div>
+      {/* Garis Putus-putus */}
+      <div className="border-b border-dashed border-black my-2"></div>
 
-      {/* List Barang */}
-      <div style={{ marginBottom: '8px' }}>
-        {items.map((item) => (
-          <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-            <span style={{ color: '#000000' }}>{item.name} x{item.qty}</span>
-            <span style={{ color: '#000000' }}>{formatRupiah(item.price * item.qty)}</span>
+      {/* List Item */}
+      <div className="space-y-1">
+        {items.map((item, index) => (
+          <div key={index} className="flex flex-col">
+            <div className="font-bold truncate">{item.name}</div>
+            <div className="flex justify-between">
+              <span>{item.qty} x {formatRupiah(item.price)}</span>
+              <span>{formatRupiah(item.qty * item.price)}</span>
+            </div>
           </div>
         ))}
       </div>
 
+      <div className="border-b border-dashed border-black my-2"></div>
+
       {/* Total */}
-      <div style={{ 
-          borderTop: '1px dashed #000000', 
-          paddingTop: '8px', 
-          marginBottom: '16px',
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          fontWeight: 'bold' 
-      }}>
-        <span style={{ color: '#000000' }}>TOTAL</span>
-        <span style={{ color: '#000000' }}>{formatRupiah(total)}</span>
+      <div className="flex justify-between font-bold text-xs mt-1">
+        <span>TOTAL</span>
+        <span>{formatRupiah(total)}</span>
+      </div>
+      
+      {/* Footer */}
+      <div className="text-center mt-4 text-[9px]">
+        <p>Terima Kasih</p>
+        <p>Barang yang dibeli tidak dapat ditukar/dikembalikan</p>
       </div>
 
-      {/* Footer */}
-      <div style={{ textAlign: 'center', marginTop: '16px' }}>
-        <p style={{ margin: '4px 0', color: '#000000' }}>Terima Kasih</p>
-        <p style={{ margin: 0, fontSize: '10px', color: '#000000' }}>Barang yang dibeli tidak dapat ditukar</p>
-      </div>
+      {/* CSS Khusus Print: Sembunyikan header/footer browser saat dicetak */}
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: 58mm auto; /* Paksa ukuran kertas */
+            margin: 0;       /* Hapus margin browser */
+          }
+          body * {
+            visibility: hidden; /* Sembunyikan semua elemen web */
+          }
+          /* Tampilkan HANYA area struk */
+          .print-area, .print-area * {
+            visibility: visible;
+          }
+          .print-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 58mm;
+          }
+        }
+      `}</style>
     </div>
   );
 });
 
-Receipt.displayName = "Receipt";
+Receipt.displayName = 'Receipt';
 export default Receipt;
