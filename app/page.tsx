@@ -150,8 +150,8 @@ export default function Home() {
                  </Link>
 
                  <Link href="/admin/products">
-                    <Button variant="ghost" className="w-full justify-start h-12 text-base font-normal">
-                        <Settings className="mr-3 h-5 w-5 text-slate-600" /> 
+                    <Button variant="ghost" className="flex items-center gap-2 text-slate-600">
+                        <Settings className="mh-4 w-4" /> 
                         Manajemen Produk
                     </Button>
                 </Link>
