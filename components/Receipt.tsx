@@ -35,7 +35,7 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({
         width: '58mm', 
         padding: '2mm', 
         fontFamily: "'Courier New', Courier, monospace", 
-        fontSize: '10px', 
+        fontSize: '12px', 
         lineHeight: '1.2',
         position: 'relative',
         // Border Hitam (Sesuai request Boss agar tidak kena crop)
@@ -46,9 +46,9 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({
       {/* Header */}
       <div className="text-center mb-2">
         <h2 className="font-bold text-sm uppercase">Toko Luwes</h2>
-        <p className="text-[9px]">Jl. Contoh No. 123, Yogyakarta</p>
-        <p className="text-[9px] mt-1">{date}</p>
-        <p className="text-[9px]">ID: {id}</p>
+        <p className="text-[11px]">Jl. Pacarmulyo, Gondang, Watumalang, Wonosobo</p>
+        <p className="text-[11px] mt-1">{date}</p>
+        <p className="text-[11px]">ID: {id}</p>
       </div>
 
       {/* Garis Pembatas */}
@@ -70,7 +70,7 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({
       <div className="border-b border-dashed border-black my-2"></div>
 
       {/* --- BAGIAN KALKULASI HARGA --- */}
-      <div className="flex flex-col gap-1 text-xs">
+      <div className="flex flex-col gap-1 text-sm">
         
         {/* 1. Subtotal (Hanya muncul jika ada diskon, biar jelas) */}
         {discount > 0 && (
@@ -89,7 +89,7 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({
         )}
 
         {/* 3. TOTAL AKHIR (Bold) */}
-        <div className="flex justify-between font-bold text-sm mt-1">
+        <div className="flex justify-between font-bold text-md mt-1">
           <span>TOTAL</span>
           <span>{formatRupiah(finalTotal)}</span>
         </div>
@@ -110,7 +110,7 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({
         
         {/* Info Metode Non-Tunai */}
         {paymentMethod !== 'Cash' && (
-            <div className="text-right text-[9px] mt-1 italic">
+            <div className="text-right text-[11px] mt-1 italic">
                 Dibayar via {paymentMethod}
             </div>
         )}
@@ -118,7 +118,7 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({
       </div>
       
       {/* Footer Utama */}
-      <div className="text-center mt-4 text-[9px]">
+      <div className="text-center mt-4 text-[11px]">
         <p>Terima Kasih</p>
         <p>Barang yang dibeli tidak dapat ditukar/dikembalikan</p>
       </div>
@@ -131,7 +131,7 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({
           justifyContent: 'center',    
           color: 'black'              
       }}>
-          <span className="text-[10px] leading-none opacity-50">.</span> 
+          <span className="text-[12px] leading-none opacity-50">.</span> 
       </div>
 
       {/* CSS Print */}
