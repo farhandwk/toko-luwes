@@ -10,19 +10,18 @@ interface ReceiptProps {
 
 const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ items, total, date, id }, ref) => {
   return (
-    // [PERBAIKAN] Tambahkan class "print-area" di sini
     <div 
       ref={ref} 
-      className="bg-white text-black p-2 print-area" // <--- TAMBAHKAN 'print-area'
+      className="bg-white text-black print-area"
       style={{ 
         width: '58mm', 
-        minHeight: '100mm', 
-        padding: '5mm',        // Jarak aman kiri-kanan-atas
-        paddingBottom: '50mm',
-        paddingTop: '20mm',
+        padding: '2mm', // Padding body dikurangi biar muat
         fontFamily: "'Courier New', Courier, monospace", 
         fontSize: '10px', 
-        lineHeight: '1.2'
+        lineHeight: '1.2',
+        position: 'relative',
+        // DEBUG: Uncomment baris bawah ini jika ingin melihat batas kertas (Garis Merah)
+        border: '1px solid red' 
       }}
     >
       {/* Header */}
@@ -33,7 +32,7 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ items, total, date, 
         <p className="text-[9px]">ID: {id}</p>
       </div>
 
-      {/* Garis Putus-putus */}
+      {/* Garis Pembatas */}
       <div className="border-b border-dashed border-black my-2"></div>
 
       {/* List Item */}
@@ -57,13 +56,23 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ items, total, date, 
         <span>{formatRupiah(total)}</span>
       </div>
       
-      {/* Footer */}
+      {/* Footer Utama */}
       <div className="text-center mt-4 text-[9px]">
         <p>Terima Kasih</p>
         <p>Barang yang dibeli tidak dapat ditukar/dikembalikan</p>
       </div>
 
-      {/* CSS: Sembunyikan semua KECUALI yang punya class 'print-area' */}
+      {/* --- TRIK GANJALAN (SPACER) --- */}
+      {/* Kita buat elemen fisik setinggi 1.5cm agar tidak kena auto-crop */}
+      <div style={{ height: '15mm', display: 'flex', alignItems: 'end', justifyContent: 'center' }}>
+          {/* Titik Putih di paling bawah sebagai "Jangkar" agar printer mencetak sampai sini */}
+          <span className="text-white text-[1px]">.</span> 
+      </div>
+      
+      {/* Opsi Lain: Garis Penutup (Bisa diaktifkan kalau mau ada tanda batas sobek) */}
+      {/* <div className="border-b border-dashed border-gray-300 w-full mt-2"></div> */}
+
+      {/* CSS Print */}
       <style jsx global>{`
         @media print {
           @page {
