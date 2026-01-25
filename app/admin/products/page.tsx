@@ -1,109 +1,141 @@
 "use client";
 
-import Link from "next/link"; // 1. IMPORT LINK
+import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
-import { Product } from "@/types";
+import { Product } from "@/types"; // Pastikan interface Product ada (atau ganti any sementara)
 import { formatRupiah } from "@/utils/currency";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useDebounce } from "@/hooks/useDebounce"; 
-import { PRODUCT_CATEGORIES } from "@/types/categories";
+import { useDebounce } from "@/hooks/useDebounce"; // Jika belum ada hook ini, bisa hapus dan pakai search langsung
 import { toast } from "sonner";
 import { 
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from "@/components/ui/table";
 import { 
-    Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter 
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter 
 } from "@/components/ui/dialog";
 import { 
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select";
-// 2. TAMBAHKAN IMPORT ArrowLeft
-import { Plus, Search, Edit, Trash2, PackagePlus, Loader2, ArrowLeft } from "lucide-react";
+import { Plus, Search, Edit, Trash2, PackagePlus, Loader2, ArrowLeft, Image as ImageIcon } from "lucide-react";
 
 export default function AdminProducts() {
-  const [products, setProducts] = useState<Product[]>([]);
+  // --- STATE UTAMA ---
+  const [products, setProducts] = useState<any[]>([]); // Pakai any dulu biar aman jika tipe belum update
+  const [categoriesList, setCategoriesList] = useState<any[]>([]);
+  const [unitsList, setUnitsList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // STATE FILTER & SEARCH
+  // --- STATE FILTER ---
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
+  // const debouncedSearch = useDebounce(search, 500); // Opsional
   const [categoryFilter, setCategoryFilter] = useState("Semua");
 
-  // STATE MODALS
+  // --- STATE MODAL ---
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isRestockOpen, setIsRestockOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   
-  // Form Data
-  const [formData, setFormData] = useState<Partial<Product>>({});
-  const [restockAmount, setRestockAmount] = useState<number | ''>('');
+  // State untuk membedakan mode Edit atau Tambah Baru
+  const [isEditingMode, setIsEditingMode] = useState(false); 
 
-  async function fetchProducts() {
+  // Form Data
+  const [formData, setFormData] = useState<Partial<any>>({});
+  const [restockAmount, setRestockAmount] = useState<number | ''>('');
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+
+  // 1. FETCH DATA (PRODUK, KATEGORI, SATUAN)
+  async function fetchAllData() {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/products');
-      const data = await res.json();
-      setProducts(data);
+      const [resProd, resCat, resUnit] = await Promise.all([
+        fetch('/api/products'),
+        fetch('/api/attributes?type=categories'),
+        fetch('/api/attributes?type=units')
+      ]);
+      
+      const dataProd = await resProd.json();
+      const dataCat = await resCat.json();
+      const dataUnit = await resUnit.json();
+
+      setProducts(dataProd);
+      setCategoriesList(dataCat);
+      setUnitsList(dataUnit);
     } catch (error) {
-      toast.error("Gagal ambil data");
+      toast.error("Gagal memuat data");
+      console.error(error);
     } finally {
       setIsLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchProducts();
+    fetchAllData();
   }, []);
 
+  // 2. FILTERING LOGIC
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      const matchesSearch = p.name.toLowerCase().includes(debouncedSearch.toLowerCase());
+      const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
       const matchesCategory = categoryFilter === "Semua" || p.category === categoryFilter;
       return matchesSearch && matchesCategory;
     });
-  }, [products, debouncedSearch, categoryFilter]);
+  }, [products, search, categoryFilter]);
 
+  // 3. FUNGSI HAPUS
   const handleDelete = async (id: string) => {
     if(!confirm("Yakin hapus produk ini?")) return;
     try {
         await fetch(`/api/products?id=${id}`, { method: 'DELETE' });
         toast.success("Produk dihapus");
-        fetchProducts();
+        fetchAllData();
     } catch (e) { toast.error("Gagal hapus"); }
   };
 
-  const handleSaveEdit = async () => {
-    if (!editingProduct) return;
-    try {
-        const res = await fetch('/api/products', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formData),
-        });
-        if (res.ok) {
-            toast.success("Produk diperbarui!");
-            setIsEditOpen(false);
-            fetchProducts();
-        } else throw new Error();
-    } catch (e) { toast.error("Gagal update produk"); }
-  };
-
-  const handleRestock = async () => {
-    if (!editingProduct || typeof restockAmount !== 'number' || restockAmount <= 0) {
-        toast.error("Masukkan jumlah stok yang valid");
+  // 4. FUNGSI SIMPAN (TAMBAH / EDIT)
+  const handleSaveProduct = async () => {
+    // Validasi Sederhana
+    if (!formData.name || !formData.price || !formData.category) {
+        toast.error("Nama, Harga, dan Kategori wajib diisi");
         return;
     }
 
-    const newStock = editingProduct.stock + restockAmount;
+    try {
+        // Tentukan Method: POST (Baru) atau PUT (Edit)
+        const method = isEditingMode ? 'PUT' : 'POST';
+        
+        const res = await fetch('/api/products', {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData),
+        });
+
+        if (res.ok) {
+            toast.success(isEditingMode ? "Produk diperbarui!" : "Produk berhasil ditambah!");
+            setIsEditOpen(false);
+            fetchAllData();
+        } else {
+            throw new Error();
+        }
+    } catch (e) { toast.error("Gagal menyimpan produk"); }
+  };
+
+  // 5. FUNGSI RESTOCK
+  const handleRestock = async () => {
+    if (!selectedProduct || typeof restockAmount !== 'number' || restockAmount <= 0) {
+        toast.error("Jumlah stok tidak valid");
+        return;
+    }
+
+    const newStock = (selectedProduct.stock || 0) + restockAmount;
 
     try {
+        // Kita gunakan endpoint PUT produk untuk update stok
         const res = await fetch('/api/products', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                ...editingProduct,
+                ...selectedProduct,
                 stock: newStock
             }),
         });
@@ -112,21 +144,37 @@ export default function AdminProducts() {
             toast.success(`Stok bertambah +${restockAmount}. Total: ${newStock}`);
             setIsRestockOpen(false);
             setRestockAmount('');
-            fetchProducts();
+            fetchAllData();
         } else throw new Error();
     } catch (e) { toast.error("Gagal restock"); }
   };
 
-  const openEdit = (p: Product) => { setEditingProduct(p); setFormData(p); setIsEditOpen(true); };
-  const openRestock = (p: Product) => { setEditingProduct(p); setRestockAmount(''); setIsRestockOpen(true); };
+  // --- HANDLERS MODAL ---
+  const openAddModal = () => {
+      setIsEditingMode(false);
+      setFormData({ name: "", price: 0, stock: 0, category: "", unit: "", image: "" });
+      setIsEditOpen(true);
+  };
+
+  const openEditModal = (p: any) => {
+      setIsEditingMode(true);
+      setFormData(p); // Isi form dengan data produk yang dipilih
+      setIsEditOpen(true);
+  };
+
+  const openRestockModal = (p: any) => {
+      setSelectedProduct(p);
+      setRestockAmount('');
+      setIsRestockOpen(true);
+  };
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
+    <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
       
       {/* HEADER & ACTIONS */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         
-        {/* 3. TOMBOL KEMBALI + JUDUL */}
+        {/* Tombol Kembali + Judul */}
         <div className="flex items-center gap-4">
             <Link href="/">
                 <Button variant="outline" size="icon" className="h-10 w-10 border-slate-300 hover:bg-slate-100" title="Kembali ke Menu Utama">
@@ -139,6 +187,10 @@ export default function AdminProducts() {
             </div>
         </div>
 
+        {/* Tombol Tambah Produk */}
+        <Button onClick={openAddModal} className="bg-primary hover:bg-primary/90">
+            <Plus className="mr-2 h-4 w-4" /> Tambah Produk
+        </Button>
       </div>
 
       {/* FILTER BAR */}
@@ -153,13 +205,16 @@ export default function AdminProducts() {
             />
         </div>
         <div className="w-full md:w-48">
+            {/* FILTER DINAMIS DARI DB */}
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger>
                     <SelectValue placeholder="Kategori" />
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem value="Semua">Semua Kategori</SelectItem>
-                    {PRODUCT_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {categoriesList.map(c => (
+                        <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                    ))}
                 </SelectContent>
             </Select>
         </div>
@@ -174,13 +229,14 @@ export default function AdminProducts() {
                     <TableHead>Kategori</TableHead>
                     <TableHead>Harga</TableHead>
                     <TableHead className="text-center">Stok</TableHead>
+                    <TableHead className="text-center">Satuan</TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {isLoading ? (
                     <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center">
+                        <TableCell colSpan={6} className="h-24 text-center">
                             <div className="flex justify-center items-center gap-2 text-slate-500">
                                 <Loader2 className="animate-spin h-5 w-5" /> Memuat data...
                             </div>
@@ -188,7 +244,7 @@ export default function AdminProducts() {
                     </TableRow>
                 ) : filteredProducts.length === 0 ? (
                     <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center text-slate-500">
+                        <TableCell colSpan={6} className="h-24 text-center text-slate-500">
                             Produk tidak ditemukan.
                         </TableCell>
                     </TableRow>
@@ -200,17 +256,26 @@ export default function AdminProducts() {
                                     {p.image ? (
                                         <img src={p.image} alt={p.name} className="h-10 w-10 rounded object-cover border" />
                                     ) : (
-                                        <div className="h-10 w-10 rounded bg-slate-100 border flex items-center justify-center text-xs text-slate-400">Img</div>
+                                        <div className="h-10 w-10 rounded bg-slate-100 border flex items-center justify-center text-slate-400">
+                                            <ImageIcon className="h-4 w-4" />
+                                        </div>
                                     )}
                                     <span>{p.name}</span>
                                 </div>
                             </TableCell>
-                            <TableCell><span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">{p.category}</span></TableCell>
+                            <TableCell>
+                                <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-slate-50 text-slate-600">
+                                    {p.category}
+                                </span>
+                            </TableCell>
                             <TableCell>{formatRupiah(p.price)}</TableCell>
                             <TableCell className="text-center">
                                 <span className={`font-bold ${p.stock < 5 ? 'text-red-500' : 'text-slate-700'}`}>
                                     {p.stock}
                                 </span>
+                            </TableCell>
+                            <TableCell className="text-center text-sm text-slate-500">
+                                {p.unit || '-'}
                             </TableCell>
                             <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
@@ -218,13 +283,13 @@ export default function AdminProducts() {
                                         size="sm" 
                                         variant="outline" 
                                         className="text-green-600 border-green-200 hover:bg-green-50"
-                                        onClick={() => openRestock(p)}
+                                        onClick={() => openRestockModal(p)}
                                         title="Tambah Stok"
                                     >
                                         <PackagePlus className="h-4 w-4" />
                                     </Button>
 
-                                    <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>
+                                    <Button size="sm" variant="ghost" onClick={() => openEditModal(p)}>
                                         <Edit className="h-4 w-4 text-blue-600" />
                                     </Button>
                                     <Button size="sm" variant="ghost" onClick={() => handleDelete(p.id)}>
@@ -239,31 +304,91 @@ export default function AdminProducts() {
         </Table>
       </div>
 
-      {/* MODAL EDIT */}
+      {/* MODAL EDIT / TAMBAH PRODUK */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
-                <DialogTitle>Edit Produk</DialogTitle>
+                <DialogTitle>{isEditingMode ? 'Edit Produk' : 'Tambah Produk Baru'}</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+                {/* Nama Produk */}
                 <div className="grid gap-2">
-                    <Label>Nama Produk</Label>
-                    <Input value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
+                    <Label>Nama Produk <span className="text-red-500">*</span></Label>
+                    <Input 
+                        placeholder="Contoh: Kopi Kapal Api"
+                        value={formData.name || ''} 
+                        onChange={e => setFormData({...formData, name: e.target.value})} 
+                    />
                 </div>
-                <div className="grid grid-2 gap-4 grid-cols-2">
+
+                <div className="grid grid-cols-2 gap-4">
+                    {/* Kategori (Dinamis) */}
                     <div className="grid gap-2">
-                        <Label>Harga</Label>
-                        <Input type="number" value={formData.price || 0} onChange={e => setFormData({...formData, price: Number(e.target.value)})} />
+                        <Label>Kategori <span className="text-red-500">*</span></Label>
+                        <Select 
+                            value={formData.category} 
+                            onValueChange={val => setFormData({...formData, category: val})}
+                        >
+                            <SelectTrigger><SelectValue placeholder="Pilih..." /></SelectTrigger>
+                            <SelectContent>
+                                {categoriesList.map(c => (
+                                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
+
+                    {/* Satuan (Dinamis) */}
                     <div className="grid gap-2">
-                        <Label>Stok (Manual)</Label>
-                        <Input type="number" value={formData.stock || 0} onChange={e => setFormData({...formData, stock: Number(e.target.value)})} />
+                        <Label>Satuan</Label>
+                        <Select 
+                            value={formData.unit || ''} 
+                            onValueChange={val => setFormData({...formData, unit: val})}
+                        >
+                            <SelectTrigger><SelectValue placeholder="Pilih..." /></SelectTrigger>
+                            <SelectContent>
+                                {unitsList.map(u => (
+                                    <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    {/* Harga */}
+                    <div className="grid gap-2">
+                        <Label>Harga Jual (Rp) <span className="text-red-500">*</span></Label>
+                        <Input 
+                            type="number" 
+                            value={formData.price || 0} 
+                            onChange={e => setFormData({...formData, price: Number(e.target.value)})} 
+                        />
+                    </div>
+                    {/* Stok Awal */}
+                    <div className="grid gap-2">
+                        <Label>Stok Awal</Label>
+                        <Input 
+                            type="number" 
+                            value={formData.stock || 0} 
+                            onChange={e => setFormData({...formData, stock: Number(e.target.value)})} 
+                        />
+                    </div>
+                </div>
+                
+                {/* Image URL (Opsional) */}
+                <div className="grid gap-2">
+                    <Label>URL Gambar (Opsional)</Label>
+                    <Input 
+                        placeholder="https://..."
+                        value={formData.image || ''} 
+                        onChange={e => setFormData({...formData, image: e.target.value})} 
+                    />
                 </div>
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={() => setIsEditOpen(false)}>Batal</Button>
-                <Button onClick={handleSaveEdit}>Simpan Perubahan</Button>
+                <Button onClick={handleSaveProduct}>{isEditingMode ? 'Simpan Perubahan' : 'Buat Produk'}</Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -278,14 +403,14 @@ export default function AdminProducts() {
                 </DialogTitle>
             </DialogHeader>
             
-            {editingProduct && (
+            {selectedProduct && (
                 <div className="space-y-4 py-4">
                     <div className="bg-slate-50 p-3 rounded-md border text-sm">
                         <p className="text-slate-500">Produk:</p>
-                        <p className="font-bold text-base">{editingProduct.name}</p>
+                        <p className="font-bold text-base">{selectedProduct.name}</p>
                         <div className="flex justify-between mt-2">
                             <span>Stok Sekarang:</span>
-                            <span className="font-mono font-bold">{editingProduct.stock}</span>
+                            <span className="font-mono font-bold">{selectedProduct.stock} {selectedProduct.unit}</span>
                         </div>
                     </div>
 
@@ -301,10 +426,10 @@ export default function AdminProducts() {
                                 onChange={(e) => setRestockAmount(Number(e.target.value))}
                                 onKeyDown={(e) => e.key === 'Enter' && handleRestock()}
                             />
-                            <span className="text-slate-400 text-sm">pcs</span>
+                            <span className="text-slate-400 text-sm">{selectedProduct.unit || 'pcs'}</span>
                         </div>
                         <p className="text-xs text-slate-400">
-                            Stok akan menjadi: <strong>{editingProduct.stock + (Number(restockAmount) || 0)}</strong>
+                            Stok akan menjadi: <strong>{(selectedProduct.stock || 0) + (Number(restockAmount) || 0)}</strong>
                         </p>
                     </div>
                 </div>

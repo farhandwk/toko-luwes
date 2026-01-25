@@ -85,6 +85,15 @@ export default function MobileSidebar({ onRefresh }: MobileSidebarProps) {
                 </Link>
             </SheetClose>
 
+            <SheetClose asChild>
+              <Link href="/admin/settings">
+                  <Button variant="ghost" className="w-full justify-start h-12 text-base font-normal">
+                      <Settings className="mr-3 h-5 w-5 text-slate-600" /> 
+                      Pengaturan Data
+                  </Button>
+              </Link>
+          </SheetClose>
+
             <Separator className="my-2" />
 
             <SheetClose asChild>
@@ -97,6 +106,7 @@ export default function MobileSidebar({ onRefresh }: MobileSidebarProps) {
                     Refresh Data
                 </Button>
             </SheetClose>
+            
         </div>
       </SheetContent>
     </Sheet>

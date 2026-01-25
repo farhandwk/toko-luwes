@@ -1,42 +1,42 @@
 "use client";
 
-import Link from 'next/link';
-import React, { useEffect, useState, useMemo } from 'react';
-import { Product } from '@/types';
-import ProductCard from '@/components/ProductCard';
-import { Skeleton } from "@/components/ui/skeleton";
+import { useState, useEffect } from "react";
+import ProductCard from "@/components/ProductCard";
+import CartDrawer from "@/components/CartDrawer";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search, Loader2, LayoutGrid, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
-import CartDrawer from '@/components/CartDrawer'; 
-import { useCartStore } from '@/hooks/useCart';
-import { Input } from '@/components/ui/input'; 
-import { Search, X, History, Settings, RefreshCw, BarChart3 } from 'lucide-react'; 
-import { Button } from '@/components/ui/button';
-import { PRODUCT_CATEGORIES } from '../types/categories';
-// Import Sidebar Baru
-import MobileSidebar from '@/components/MobileSidebar';
+import { useCartStore } from "@/hooks/useCart"; 
 
 export default function Home() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]); 
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Semua");
-  const { addItem } = useCartStore();
+  const { addItem } = useCartStore(); 
 
-  const fetchProducts = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/products');
-      const data = await res.json();
-      setProducts(data);
-    } catch (error) {
-      console.error('Gagal ambil data:', error);
-      toast.error("Gagal memuat data produk");
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [resProducts, resCategories] = await Promise.all([
+          fetch('/api/products'),
+          fetch('/api/attributes?type=categories')
+        ]);
+        const dataProducts = await resProducts.json();
+        const dataCategories = await resCategories.json();
+
+        if (Array.isArray(dataProducts)) setProducts(dataProducts);
+        else { setProducts([]); if (dataProducts.error) toast.error("Gagal: " + dataProducts.error); }
+
+        if (Array.isArray(dataCategories)) setCategories(dataCategories);
+        else setCategories([]);
+
+      } catch (error) { console.error(error); setProducts([]); } finally { setIsLoading(false); }
     }
-  };
-
-  useEffect(() => { fetchProducts(); }, []);
+    fetchData();
+  }, []);
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -44,109 +44,57 @@ export default function Home() {
     return matchesSearch && matchesCategory;
   });
 
-  const handleAddToCart = (product: Product) => {
-    addItem(product);
-    toast.success(`${product.name} +1`, { duration: 1000 });
-  };
-
   return (
-    <main className="min-h-screen bg-slate-50 pb-20">
+    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
       {/* HEADER */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b shadow-sm">
-        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4">
-            
-            {/* BARIS 1: JUDUL & MENU */}
-            <div className="flex justify-between items-center">
-                <div className="flex items-center">
-                    {/* [LOGIC BARU] Mobile Sidebar (Hanya muncul di < lg) */}
-                    <MobileSidebar onRefresh={fetchProducts} />
-                    
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-bold text-slate-900">Toko Luwes</h1>
-                        <p className="text-xs text-slate-500 hidden md:block">Kasir Point of Sales</p>
-                    </div>
-                </div>
-                
-                {/* [LOGIC BARU] Desktop Menu (Hanya muncul di Laptop >= lg) */}
-                <div className="hidden lg:flex items-center gap-2">
-                    <Link href="/transactions">
-                        <Button variant="ghost" size="sm" className="gap-2">
-                            <History className="h-4 w-4 text-slate-600" />
-                            Riwayat
-                        </Button>
-                    </Link>
-
-                    <Link href="/admin/products">
-                        <Button variant="ghost" size="sm" className="gap-2">
-                            <Settings className="h-4 w-4 text-slate-600" />
-                            Produk
-                        </Button>
-                    </Link>
-
-                    <Link href="/admin/analytics">
-                        <Button variant="ghost" size="sm" className="gap-2">
-                            <BarChart3 className="h-4 w-4 text-slate-600" /> 
-                            Analytics / Dashboard
-                        </Button>
-                    </Link>
-
-                    <div className="w-px h-6 bg-slate-200 mx-1"></div>
-
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={fetchProducts} 
-                        title="Refresh Data"
-                    >
-                        <RefreshCw className="h-4 w-4 text-slate-500" />
-                    </Button>
-                </div>
-
-                {/* Mobile Refresh (Opsional, jika ingin tombol refresh cepat di HP juga) */}
-                <div className="lg:hidden">
-                    <Button variant="ghost" size="icon" onClick={fetchProducts}>
-                        <RefreshCw className="h-5 w-5 text-slate-600" />
-                    </Button>
-                </div>
+      <header className="bg-white border-b shadow-sm z-10 flex-shrink-0">
+        <div className="max-w-7xl mx-auto px-4 py-4 space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold text-slate-900 flex items-center gap-2">
+                <ShoppingBag className="h-6 w-6 text-primary" /> Toko Luwes
+              </h1>
+              <p className="text-xs text-slate-500">Kasir Point of Sales</p>
             </div>
-
-            {/* BARIS 2: SEARCH */}
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input placeholder="Cari produk..." className="pl-9 bg-slate-50" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-                {searchQuery && (<button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X className="h-4 w-4" /></button>)}
+            <div className="relative w-full md:w-96">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input placeholder="Cari produk..." className="pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}/>
             </div>
-
-            {/* BARIS 3: KATEGORI */}
-            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-                <Button variant={selectedCategory === "Semua" ? "default" : "outline"} size="sm" onClick={() => setSelectedCategory("Semua")} className="rounded-full px-4 text-xs">Semua</Button>
-                {PRODUCT_CATEGORIES.map((cat) => (
-                    <Button key={cat} variant={selectedCategory === cat ? "default" : "outline"} size="sm" onClick={() => setSelectedCategory(cat)} className="rounded-full px-4 text-xs whitespace-nowrap">
-                        {cat}
-                    </Button>
-                ))}
-            </div>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            <Button variant={selectedCategory === "Semua" ? "default" : "outline"} size="sm" onClick={() => setSelectedCategory("Semua")} className="rounded-full px-4 flex-shrink-0">Semua</Button>
+            {categories.map((cat) => (
+              <Button key={cat.id} variant={selectedCategory === cat.name ? "default" : "outline"} size="sm" onClick={() => setSelectedCategory(cat.name)} className="rounded-full px-4 flex-shrink-0">{cat.name}</Button>
+            ))}
+          </div>
         </div>
       </header>
 
-      {/* MAIN CONTENT (Grid Layout SAMA SEPERTI SEBELUMNYA) */}
-      <div className="max-w-7xl mx-auto p-4 md:p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            <div className="lg:col-span-2">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pb-24 lg:pb-0">
-                    {loading ? Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full rounded-xl" />) 
-                    : filteredProducts.length > 0 ? filteredProducts.map((p) => <ProductCard key={p.id} product={p} onAddToCart={handleAddToCart} />) 
-                    : <div className="col-span-full py-20 text-center text-slate-400">Produk tidak ditemukan</div>}
-                </div>
-            </div>
-            <div className="hidden lg:block lg:col-span-1">
-                <div className="sticky top-24 z-10"> 
-                    <CartDrawer onCheckoutSuccess={fetchProducts} className="shadow-lg border rounded-xl overflow-hidden bg-white h-[calc(100vh-140px)]" />
-                </div>
-            </div>
-            <div className="lg:hidden"><CartDrawer onCheckoutSuccess={fetchProducts} /></div>
-        </div>
+      {/* KONTEN UTAMA */}
+      <div className="flex flex-1 overflow-hidden relative">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50 lg:mr-[400px]">
+          <div className="max-w-7xl mx-auto">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-2"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p>Memuat produk...</p></div>
+            ) : filteredProducts.length > 0 ? (
+              // GRID 4 KOLOM (lg:grid-cols-4) SESUAI REQUEST
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 gap-3 md:gap-4 pb-24">
+                {filteredProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} onAddToCart={addItem} />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
+                <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center"><LayoutGrid className="h-8 w-8 text-slate-300" /></div>
+                <p>Produk tidak ditemukan.</p>
+                <Button variant="link" onClick={() => { setSearchQuery(""); setSelectedCategory("Semua"); }}>Reset Filter</Button>
+              </div>
+            )}
+          </div>
+        </main>
+        {/* Cart Drawer akan melayang di kanan */}
+        <CartDrawer />
       </div>
-    </main>
+    </div>
   );
 }
