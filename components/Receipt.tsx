@@ -18,8 +18,8 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ items, total, date, 
         width: '58mm', 
         minHeight: '100mm', 
         padding: '5mm',        // Jarak aman kiri-kanan-atas
-        paddingBottom: '15mm',
-        paddingTop: '15mm',
+        paddingBottom: '50mm',
+        paddingTop: '20mm',
         fontFamily: "'Courier New', Courier, monospace", 
         fontSize: '10px', 
         lineHeight: '1.2'
