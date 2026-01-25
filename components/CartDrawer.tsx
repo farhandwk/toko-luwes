@@ -115,7 +115,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     const file = new File([receiptBlob], `struk-${lastTxId}.png`, { type: "image/png" });
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'Struk Belanja', text: `Struk ${lastTxId}` }); } 
+        try { await navigator.share({ files: [file], title: 'Struk Belanja', text: `${messageText}` }); } 
         catch (error) { console.log("Share dibatalkan"); }
     } else { window.open(waUrl, '_blank'); toast.info("WhatsApp terbuka!"); }
   };
