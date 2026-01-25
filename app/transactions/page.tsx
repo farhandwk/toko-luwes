@@ -1,316 +1,366 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { formatRupiah } from '@/utils/currency';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+import Link from "next/link";
+import { useEffect, useState, useRef, useMemo } from "react";
+import { formatRupiah } from "@/utils/currency";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label"; // Import Label
+import { 
+    Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+import { 
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter 
 } from "@/components/ui/dialog";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+import { 
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select";
-import { Loader2, ArrowLeft, Calendar, FileText, XCircle } from 'lucide-react'; // <--- Tambah XCircle
-import Link from 'next/link';
-
-interface Transaction {
-  id: string;
-  date: string;
-  items: string;
-  total: string;
-  paymentMethod: string;
-  proofLink: string;
-}
+import { Search, FileText, Printer, Loader2, ArrowLeft, Eye, Calendar, ArrowUpDown } from "lucide-react";
+import Receipt from "@/components/Receipt"; 
+import { useReactToPrint } from 'react-to-print';
+import { toast } from "sonner";
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
+  // --- STATE FILTER & SORT ---
+  const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [sortOrder, setSortOrder] = useState("newest");
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // Default: Terbaru
+  
+  // State Modal
+  const [selectedTrx, setSelectedTrx] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  // FUNGSI PARSING TANGGAL INDONESIA (PENTING!)
+  const parseCustomDate = (dateStr: string) => {
+    if (!dateStr) return new Date();
+    const standardDate = new Date(dateStr);
+    if (!isNaN(standardDate.getTime())) return standardDate;
+
+    try {
+        // Format: "25/01/2026, 8:56:39"
+        const parts = dateStr.split(','); 
+        const datePart = parts[0].trim(); 
+        const timePart = parts[1] ? parts[1].trim() : "00:00:00";
+
+        const [day, month, year] = datePart.split('/').map(Number);
+        const [hour, minute, second] = timePart.split(':').map(Number);
+
+        return new Date(year, month - 1, day, hour || 0, minute || 0, second || 0);
+    } catch (e) {
+        return new Date(); 
+    }
+  };
 
   useEffect(() => {
+    async function fetchTransactions() {
+      try {
+        const res = await fetch('/api/transactions');
+        const data = await res.json();
+        setTransactions(data);
+      } catch (error) {
+        console.error("Gagal ambil data", error);
+        toast.error("Gagal memuat data transaksi");
+      } finally {
+        setIsLoading(false);
+      }
+    }
     fetchTransactions();
   }, []);
 
-  const fetchTransactions = async () => {
-    try {
-      const res = await fetch('/api/transactions');
-      const data = await res.json();
-      setTransactions(data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
+  // --- LOGIKA FILTER & SORTING (DIPERBARUI) ---
+  const filteredAndSortedTransactions = useMemo(() => {
+    let data = [...transactions];
+
+    // 1. Filter Pencarian (ID atau Metode)
+    if (search) {
+        const lowerSearch = search.toLowerCase();
+        data = data.filter(t => 
+            t.id.toLowerCase().includes(lowerSearch) ||
+            (t.paymentMethod && t.paymentMethod.toLowerCase().includes(lowerSearch))
+        );
     }
+
+    // 2. Filter Rentang Tanggal
+    if (startDate || endDate) {
+        data = data.filter(t => {
+            const tDate = parseCustomDate(t.date);
+            // Set jam ke 00:00:00 agar perbandingan tanggal akurat
+            const tTime = new Date(tDate.getFullYear(), tDate.getMonth(), tDate.getDate()).getTime();
+
+            let isValid = true;
+            if (startDate) {
+                const sDate = new Date(startDate); // YYYY-MM-DD dari input
+                const sTime = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate()).getTime();
+                if (tTime < sTime) isValid = false;
+            }
+            if (endDate) {
+                const eDate = new Date(endDate);
+                const eTime = new Date(eDate.getFullYear(), eDate.getMonth(), eDate.getDate()).getTime();
+                if (tTime > eTime) isValid = false;
+            }
+            return isValid;
+        });
+    }
+
+    // 3. Sorting (Terbaru/Terlama)
+    data.sort((a, b) => {
+        const dateA = parseCustomDate(a.date).getTime();
+        const dateB = parseCustomDate(b.date).getTime();
+        return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
+    });
+
+    return data;
+  }, [transactions, search, startDate, endDate, sortOrder]);
+
+
+  const parseItems = (itemsData: any) => {
+      try {
+          if (typeof itemsData === 'string') return JSON.parse(itemsData);
+          return itemsData;
+      } catch (e) { return []; }
   };
 
-  // ✅ FUNGSI PARSE TANGGAL & JAM (ROBUS)
-  const parseDate = (dateStr: string) => {
-    if (!dateStr) return new Date(0);
-
-    let cleanDateStr = dateStr;
-    let timeStr = "00:00:00";
-
-    // Pisahkan Tanggal dan Jam jika ada koma (format baru)
-    if (dateStr.includes(',')) {
-        const parts = dateStr.split(',');
-        cleanDateStr = parts[0].trim();
-        timeStr = parts[1].trim();
-    }
-
-    let dateObj = new Date();
-    
-    // Deteksi Format Tanggal
-    if (cleanDateStr.includes('/')) {
-        // Format Indonesia: DD/MM/YYYY
-        const [d, m, y] = cleanDateStr.split('/');
-        dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-    } else if (cleanDateStr.includes('-')) {
-        // Format ISO: YYYY-MM-DD
-        dateObj = new Date(cleanDateStr);
-    }
-
-    // Set Jam (Penting untuk Sorting yang presisi)
-    if (timeStr) {
-        const [h, m, s] = timeStr.split(':').map(Number);
-        if (!isNaN(h)) dateObj.setHours(h);
-        if (!isNaN(m)) dateObj.setMinutes(m);
-        if (!isNaN(s)) dateObj.setSeconds(s || 0);
-    }
-
-    return dateObj;
-  };
-
-  // LOGIKA FILTER & SORTING
-  const filteredData = transactions.filter((trx) => {
-    if (!startDate && !endDate) return true;
-    
-    const trxDate = parseDate(trx.date);
-    trxDate.setHours(0, 0, 0, 0); // Reset jam untuk perbandingan tanggal saja
-
-    const start = startDate ? new Date(startDate) : null;
-    if (start) start.setHours(0, 0, 0, 0);
-
-    const end = endDate ? new Date(endDate) : null;
-    if (end) end.setHours(0, 0, 0, 0);
-
-    if (start && trxDate < start) return false;
-    if (end && trxDate > end) return false;
-    
-    return true;
-  }).sort((a, b) => {
-     const dateA = parseDate(a.date).getTime();
-     const dateB = parseDate(b.date).getTime();
-     return sortOrder === "newest" ? dateB - dateA : dateA - dateB;
+  const handlePrint = useReactToPrint({
+    contentRef: receiptRef,
+    documentTitle: `Struk-${selectedTrx?.id}`,
+    onAfterPrint: () => toast.success("Struk dicetak ulang!"),
   });
 
-  const parseItems = (jsonString: string) => {
-    try {
-      const items = JSON.parse(jsonString);
-      return items.map((i: any) => `${i.name} (x${i.qty})`).join(', ');
-    } catch {
-      return "-";
-    }
+  const openReceiptModal = (trx: any) => {
+      const items = parseItems(trx.items);
+      const cleanTrx = {
+          ...trx,
+          items: items,
+          discount: Number(trx.discount) || 0,
+          subTotal: Number(trx.subTotal) || Number(trx.total),
+          cashAmount: Number(trx.cashAmount) || 0,
+          changeAmount: Number(trx.changeAmount) || 0,
+      };
+      setSelectedTrx(cleanTrx);
+      setIsModalOpen(true);
   };
 
-  // Handler Hapus Filter
-  const clearFilters = () => {
-    setStartDate("");
-    setEndDate("");
+  // Fungsi Reset Filter
+  const resetFilters = () => {
+      setSearch("");
+      setStartDate("");
+      setEndDate("");
+      setSortOrder("desc");
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
-        
-        {/* Header */}
+    <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+      
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
             <Link href="/">
-                <Button variant="outline" size="icon">
-                    <ArrowLeft className="h-4 w-4" />
+                <Button variant="outline" size="icon" className="h-10 w-10">
+                    <ArrowLeft className="h-5 w-5" />
                 </Button>
             </Link>
             <div>
-                <h1 className="text-2xl font-bold">Riwayat Transaksi</h1>
-                <p className="text-slate-500 text-sm">Rekap penjualan toko</p>
+                <h1 className="text-2xl font-bold text-slate-900">Riwayat Transaksi</h1>
+                <p className="text-slate-500 text-sm">Rekap penjualan toko.</p>
             </div>
         </div>
+      </div>
 
-        {/* Filter Bar */}
-        <div className="bg-white p-4 rounded-lg border shadow-sm flex flex-col lg:flex-row gap-4 justify-between items-end lg:items-center">
+      {/* FILTER PANEL */}
+      <div className="bg-white p-4 rounded-lg border shadow-sm space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
             
-            {/* Group Kiri: Date Inputs + Reset Button */}
-            <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto items-end sm:items-center">
-                <div className="flex flex-col md:flex-row gap-2 w-full sm:w-auto">
-                    <div className="grid gap-1.5 flex-1 sm:flex-none">
-                        <label className="text-xs font-medium text-slate-500">Dari Tanggal</label>
-                        <div className="relative">
-                            <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                            <Input 
-                                type="date" 
-                                className="pl-9 w-full sm:w-[160px]" 
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="grid gap-1.5 flex-1 sm:flex-none">
-                        <label className="text-xs font-medium text-slate-500">Sampai Tanggal</label>
-                        <div className="relative">
-                            <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                            <Input 
-                                type="date" 
-                                className="pl-9 w-full sm:w-[160px]" 
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                            />
-                        </div>
-                    </div>
+            {/* 1. Pencarian Text */}
+            <div className="md:col-span-4 relative">
+                <Label className="text-xs text-slate-500 mb-1.5 block">Cari ID / Metode</Label>
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input 
+                        placeholder="Cari ID Transaksi..." 
+                        className="pl-9"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
                 </div>
-
-                {/* TOMBOL HAPUS FILTER (Muncul hanya jika ada filter) */}
-                {(startDate || endDate) && (
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={clearFilters}
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50 h-10 px-3"
-                    >
-                        <XCircle className="mr-2 h-4 w-4" />
-                        Hapus Filter
-                    </Button>
-                )}
             </div>
 
-            {/* Group Kanan: Sort */}
-            <div className="grid gap-1.5 w-full lg:w-[150px]">
-                <label className="text-xs font-medium text-slate-500">Urutkan</label>
-                <Select value={sortOrder} onValueChange={setSortOrder}>
+            {/* 2. Dari Tanggal */}
+            <div className="md:col-span-3">
+                <Label className="text-xs text-slate-500 mb-1.5 block">Dari Tanggal</Label>
+                <div className="relative">
+                    <Input 
+                        type="date" 
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="block w-full"
+                    />
+                </div>
+            </div>
+
+            {/* 3. Sampai Tanggal */}
+            <div className="md:col-span-3">
+                <Label className="text-xs text-slate-500 mb-1.5 block">Sampai Tanggal</Label>
+                <Input 
+                    type="date" 
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="block w-full"
+                />
+            </div>
+
+            {/* 4. Urutkan (Sort) */}
+            <div className="md:col-span-2">
+                <Label className="text-xs text-slate-500 mb-1.5 block">Urutkan</Label>
+                <Select value={sortOrder} onValueChange={(v: "asc" | "desc") => setSortOrder(v)}>
                     <SelectTrigger>
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="newest">Terbaru</SelectItem>
-                        <SelectItem value="oldest">Terlama</SelectItem>
+                        <SelectItem value="desc">Terbaru</SelectItem>
+                        <SelectItem value="asc">Terlama</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
         </div>
+        
+        {/* Tombol Reset Filter (Hanya muncul jika ada filter aktif) */}
+        {(search || startDate || endDate || sortOrder !== 'desc') && (
+            <div className="flex justify-end">
+                <Button variant="ghost" size="sm" onClick={resetFilters} className="text-red-500 h-8 text-xs hover:bg-red-50 hover:text-red-600">
+                    Reset Filter
+                </Button>
+            </div>
+        )}
+      </div>
 
-        {/* Table Transaksi */}
-        <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-            <Table>
-                <TableHeader>
+      {/* TABEL TRANSAKSI */}
+      <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+        <Table>
+            <TableHeader className="bg-slate-50">
+                <TableRow>
+                    <TableHead>ID Transaksi</TableHead>
+                    <TableHead>Tanggal & Waktu</TableHead>
+                    <TableHead>Metode</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-center">Aksi</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {isLoading ? (
                     <TableRow>
-                        <TableHead className="w-[120px]">ID TRX</TableHead>
-                        <TableHead>Waktu</TableHead>
-                        <TableHead className="hidden md:table-cell">Items</TableHead>
-                        <TableHead>Metode</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="text-center">Aksi</TableHead>
+                        <TableCell colSpan={5} className="h-24 text-center">
+                            <div className="flex justify-center items-center gap-2 text-slate-500">
+                                <Loader2 className="animate-spin h-5 w-5" /> Memuat data...
+                            </div>
+                        </TableCell>
                     </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {loading ? (
-                        <TableRow>
-                            <TableCell colSpan={6} className="h-24 text-center">
-                                <div className="flex justify-center items-center gap-2 text-slate-500">
-                                    <Loader2 className="h-4 w-4 animate-spin" /> Memuat Data...
+                ) : filteredAndSortedTransactions.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={5} className="h-32 text-center">
+                            <div className="flex flex-col items-center justify-center text-slate-500 gap-2">
+                                <Calendar className="h-8 w-8 text-slate-300" />
+                                <p>Tidak ada transaksi ditemukan.</p>
+                                {(startDate || endDate) && (
+                                    <p className="text-xs">Coba ubah rentang tanggal.</p>
+                                )}
+                            </div>
+                        </TableCell>
+                    </TableRow>
+                ) : (
+                    filteredAndSortedTransactions.map((t) => (
+                        <TableRow key={t.id} className="hover:bg-slate-50 transition-colors">
+                            <TableCell className="font-mono text-xs text-slate-600">{t.id}</TableCell>
+                            <TableCell>
+                                <div className="flex flex-col">
+                                    <span className="font-medium">
+                                        {parseCustomDate(t.date).toLocaleDateString('id-ID', {
+                                            day: 'numeric', month: 'short', year: 'numeric'
+                                        })}
+                                    </span>
+                                    <span className="text-xs text-slate-400">
+                                        {parseCustomDate(t.date).toLocaleTimeString('id-ID', {
+                                            hour: '2-digit', minute: '2-digit'
+                                        })}
+                                    </span>
                                 </div>
                             </TableCell>
-                        </TableRow>
-                    ) : filteredData.length === 0 ? (
-                        <TableRow>
-                            <TableCell colSpan={6} className="h-24 text-center text-slate-500">
-                                Tidak ada transaksi ditemukan.
+                            <TableCell>
+                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border
+                                    ${t.paymentMethod === 'Cash' 
+                                        ? 'bg-green-50 text-green-700 border-green-200' 
+                                        : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                                    {t.paymentMethod || 'Cash'}
+                                </span>
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-slate-900">
+                                {formatRupiah(t.total)}
+                            </TableCell>
+                            <TableCell className="text-center">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-8 w-8 p-0 border-slate-200"
+                                    onClick={() => openReceiptModal(t)}
+                                    title="Lihat Struk"
+                                >
+                                    <Eye className="h-4 w-4 text-blue-600" />
+                                </Button>
                             </TableCell>
                         </TableRow>
-                    ) : (
-                        filteredData.map((trx) => (
-                            <TableRow key={trx.id}>
-                                <TableCell className="font-mono text-xs text-slate-500">{trx.id}</TableCell>
-                                <TableCell>
-                                    <div className="flex flex-col">
-                                        <span className="font-medium text-sm">
-                                            {trx.date.includes(',') ? trx.date.split(',')[0] : trx.date}
-                                        </span>
-                                        <span className="text-xs text-slate-400">
-                                            {trx.date.includes(',') ? trx.date.split(',')[1] : ''}
-                                        </span>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="hidden md:table-cell text-sm text-slate-600 truncate max-w-[200px]">
-                                    {parseItems(trx.items)}
-                                </TableCell>
-                                <TableCell>
-                                    <span className={`px-2 py-1 rounded-full text-[10px] uppercase font-bold tracking-wider ${
-                                        trx.paymentMethod === 'Cash' 
-                                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 
-                                        : 'bg-blue-100 text-blue-700 border border-blue-200'
-                                    }`}>
-                                        {trx.paymentMethod}
-                                    </span>
-                                </TableCell>
-                                <TableCell className="text-right font-bold text-slate-900">
-                                    {formatRupiah(Number(trx.total))}
-                                </TableCell>
-                                <TableCell className="text-center">
-                                    {trx.proofLink ? (
-                                        <Dialog>
-                                            <DialogTrigger asChild>
-                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-50">
-                                                    <FileText className="h-4 w-4" />
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent className="max-w-sm">
-                                                <DialogHeader>
-                                                    <DialogTitle>Bukti Transaksi</DialogTitle>
-                                                </DialogHeader>
-                                                <div className="flex justify-center p-4 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-                                                    <img 
-                                                        src={trx.proofLink} 
-                                                        alt="Struk Belanja" 
-                                                        className="w-full h-auto object-contain shadow-md"
-                                                    />
-                                                </div>
-                                                <div className="flex justify-center pt-2">
-                                                    <Button variant="outline" size="sm" asChild className="text-xs">
-                                                        <a href={trx.proofLink} target="_blank" rel="noreferrer">
-                                                            Buka Link Asli ↗
-                                                        </a>
-                                                    </Button>
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
-                                    ) : (
-                                        <span className="text-xs text-slate-300">-</span>
-                                    )}
-                                </TableCell>
-                            </TableRow>
-                        ))
-                    )}
-                </TableBody>
-            </Table>
+                    ))
+                )}
+            </TableBody>
+        </Table>
+        
+        {/* Footer Info Jumlah Data */}
+        <div className="bg-slate-50 border-t p-3 text-xs text-slate-500 text-center">
+            Menampilkan <strong>{filteredAndSortedTransactions.length}</strong> transaksi
+            {(startDate || endDate) && ` dalam periode yang dipilih`}
         </div>
       </div>
+
+      {/* MODAL STRUK */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" /> Detail Transaksi
+                </DialogTitle>
+            </DialogHeader>
+
+            <div className="flex justify-center bg-slate-100 py-4 rounded-md border overflow-auto max-h-[60vh]">
+                {selectedTrx && (
+                    <div className="shadow-lg transform scale-90 origin-top">
+                        <Receipt 
+                            ref={receiptRef}
+                            items={selectedTrx.items}
+                            total={selectedTrx.subTotal} 
+                            discount={selectedTrx.discount}
+                            paymentMethod={selectedTrx.paymentMethod}
+                            cashAmount={selectedTrx.cashAmount}
+                            changeAmount={selectedTrx.changeAmount}
+                            date={selectedTrx.date}
+                            id={selectedTrx.id}
+                        />
+                    </div>
+                )}
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+                    Tutup
+                </Button>
+                <Button onClick={() => handlePrint()}>
+                    <Printer className="mr-2 h-4 w-4" /> Cetak Ulang
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -22,8 +22,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog"; 
-import { Separator } from '@/components/ui/separator';
-import { Trash2, ShoppingCart, Plus, Minus, Loader2, Send, Share2, Download, Info, Printer } from 'lucide-react'; 
+import { Trash2, ShoppingCart, Plus, Minus, Loader2, Send, Share2, Download, Printer } from 'lucide-react'; 
 import { toast } from "sonner";
 import { toPng } from 'html-to-image';
 import { useReactToPrint } from 'react-to-print'; 
@@ -36,8 +35,15 @@ interface CartDrawerProps {
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className }) => {
   const { items, addItem, decreaseQty, removeItem, clearCart, totalPrice } = useCartStore();
-  const total = totalPrice();
   
+  const subTotal = totalPrice(); // Harga barang murni
+
+  // STATE BARU: DISKON
+  const [discount, setDiscount] = useState<number | ''>('');
+  
+  // Hitung Total Akhir (Subtotal - Diskon)
+  const finalTotal = subTotal - (Number(discount) || 0);
+
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [receiptData, setReceiptData] = useState({ id: '', date: '' });
@@ -51,18 +57,26 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
   const [manualPhone, setManualPhone] = useState("");
   const [lastTxId, setLastTxId] = useState(""); 
 
-  // [PERBAIKAN] State Cadangan untuk Print Laptop setelah Clear Cart
+  // STATE CADANGAN (SNAPSHOT) UNTUK PRINT SETELAH CLEAR CART
   const [lastItems, setLastItems] = useState<any[]>([]);
-  const [lastTotal, setLastTotal] = useState(0);
+  const [lastSubTotal, setLastSubTotal] = useState(0);
+  const [lastDiscount, setLastDiscount] = useState(0);
+  const [lastPaymentMethod, setLastPaymentMethod] = useState("Cash");
+  const [lastCashReceived, setLastCashReceived] = useState(0);
+  const [lastChange, setLastChange] = useState(0);
 
+  // Hitung Kembalian (Berdasarkan Final Total)
   const change = (paymentMethod === "Cash" && typeof cashReceived === 'number') 
-    ? cashReceived - total 
+    ? cashReceived - finalTotal
     : 0;
 
   const isPaymentValid = () => {
     if (items.length === 0) return false;
+    // Validasi Diskon tidak boleh lebih besar dari total
+    if (Number(discount) > subTotal) return false;
+
     if (paymentMethod === "Cash") {
-        return (typeof cashReceived === 'number' && cashReceived >= total);
+        return (typeof cashReceived === 'number' && cashReceived >= finalTotal);
     }
     return true;
   };
@@ -74,14 +88,12 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     });
   }, [isOpen]);
 
-  // FUNGSI PRINT PC (USB)
   const handlePrintPC = useReactToPrint({
-    contentRef: receiptRef, // React-to-print akan mengambil DOM Receipt yang sudah diisi data cadangan
+    contentRef: receiptRef,
     documentTitle: `Struk-${lastTxId}`,
     onAfterPrint: () => toast.success("Perintah cetak dikirim!"),
   });
 
-  // FUNGSI PRINT HP (BLUETOOTH / RAWBT)
   const handlePrintMobile = () => {
     if (!receiptBlob) {
         toast.error("Sedang memproses gambar struk...");
@@ -105,16 +117,14 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success("Struk tersimpan di folder Download!");
+    toast.success("Struk tersimpan!");
   };
 
   const handleOpenWhatsApp = async () => {
     if (!receiptBlob) { toast.error("Gagal memuat gambar struk"); return; }
-    
     let phone = manualPhone.replace(/\D/g, '');
     if (phone.startsWith('0')) phone = '62' + phone.slice(1);
-    
-    const messageText = encodeURIComponent(`Halo Kak, terima kasih sudah berbelanja.\nBerikut kami lampirkan struk transaksinya ya 👇`);
+    const messageText = encodeURIComponent(`Halo Kak, terima kasih sudah berbelanja.\nBerikut struk transaksinya 👇`);
     const waUrl = phone ? `https://wa.me/${phone}?text=${messageText}` : `https://wa.me/?text=${messageText}`;
 
     const file = new File([receiptBlob], `struk-${lastTxId}.png`, { type: "image/png" });
@@ -122,12 +132,11 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
 
     if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'Struk Belanja', text: `Struk Transaksi ${lastTxId}` });
-            toast.success("Membuka WhatsApp...");
-        } catch (error) { console.log("Share dibatalkan user"); }
+            await navigator.share({ files: [file], title: 'Struk Belanja', text: `Struk ${lastTxId}` });
+        } catch (error) { console.log("Share dibatalkan"); }
     } else {
         window.open(waUrl, '_blank');
-        toast.info("WhatsApp terbuka! Silakan drag & drop struk yang sudah didownload.");
+        toast.info("WhatsApp terbuka!");
     }
   };
 
@@ -137,6 +146,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     try {
       let proofLink = '';
       let currentBlob: Blob | null = null;
+
+      // 1. Generate Gambar Struk Dulu
       if (receiptRef.current) {
         try {
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -147,43 +158,47 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
              // @ts-ignore
              skipFonts: true, 
           });
-
           const res = await fetch(dataUrl);
           currentBlob = await res.blob();
           setReceiptBlob(currentBlob);
-          if (currentBlob) {
-            const formData = new FormData();
-            formData.append('file', currentBlob, 'struk.png');
-            const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-            const uploadData = await uploadRes.json();
-            if (uploadData.success) proofLink = uploadData.fileUrl;
-          }
+          
+          // (Opsional) Upload ke Cloudinary dsb di sini jika perlu
         } catch (imgError) { console.error("Gagal generate gambar:", imgError); }
       }
 
+      // 2. Kirim Data ke API
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: items,
-          total: total,
+          subTotal: subTotal,
+          discount: Number(discount) || 0,
+          total: finalTotal, // Total yang masuk database adalah setelah diskon
           paymentMethod: paymentMethod,
-          proofLink: proofLink,
           date: receiptData.date
         }),
       });
+
       const result = await response.json();
+
       if (response.ok) {
         toast.success("Transaksi Sukses!");
         setLastTxId(result.transactionId || receiptData.id);
 
-        // [PERBAIKAN] Simpan Data ke State Cadangan Sebelum ClearCart
+        // 3. Simpan Snapshot Data untuk Print Ulang (PENTING)
         setLastItems(items);
-        setLastTotal(total);
+        setLastSubTotal(subTotal);
+        setLastDiscount(Number(discount) || 0);
+        setLastPaymentMethod(paymentMethod);
+        setLastCashReceived(Number(cashReceived) || 0);
+        setLastChange(change);
 
+        // 4. Reset & Buka Dialog
         setShowSuccessDialog(true);
         clearCart();
         setCashReceived('');
+        setDiscount(''); // Reset diskon juga
         if (onCheckoutSuccess) onCheckoutSuccess();
       } else { throw new Error(result.error); }
     } catch (error) {
@@ -192,7 +207,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     } finally { setIsLoading(false); }
   };
 
-  // VARIABEL UI CART (Untuk fix focus input)
+  // --- UI ISI KERANJANG ---
   const cartContent = (
     <div className="flex flex-col h-full overflow-hidden">
         <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
@@ -200,7 +215,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
             <div className="flex flex-col items-center justify-center h-full text-gray-400">
                 <ShoppingCart className="h-12 w-12 mb-3 opacity-20" />
                 <p>Keranjang kosong.</p>
-                <p className="text-xs">Pilih produk di sebelah kiri</p>
             </div>
             ) : (
             items.map((item) => (
@@ -210,23 +224,33 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                     <p className="text-xs text-gray-500">{formatRupiah(item.price)}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => decreaseQty(item.id)}>
-                    <Minus className="h-3 w-3" />
-                    </Button>
+                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => decreaseQty(item.id)}><Minus className="h-3 w-3" /></Button>
                     <span className="text-sm font-bold w-6 text-center">{item.qty}</span>
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => addItem(item)}>
-                    <Plus className="h-3 w-3" />
-                    </Button>
+                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => addItem(item)}><Plus className="h-3 w-3" /></Button>
                 </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 ml-1 hover:bg-red-50" onClick={() => removeItem(item.id)}>
-                    <Trash2 className="h-4 w-4" />
-                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 ml-1 hover:bg-red-50" onClick={() => removeItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
             ))
             )}
         </div>
         
+        {/* FOOTER PEMBAYARAN */}
         <div className="bg-white p-4 space-y-4 border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10 relative">
+            
+            {/* INPUT DISKON (BARU) */}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2 col-span-2">
+                    <Label>Diskon (Rp)</Label>
+                    <Input 
+                        type="number" 
+                        placeholder="0" 
+                        value={discount} 
+                        onChange={(e) => setDiscount(Number(e.target.value))} 
+                        className="font-mono"
+                    />
+                </div>
+            </div>
+
             <div className="space-y-2">
                 <Label>Metode Pembayaran</Label>
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
@@ -238,6 +262,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                     </SelectContent>
                 </Select>
             </div>
+
             {paymentMethod === "Cash" && (
                 <div className="space-y-2">
                     <Label>Uang Diterima</Label>
@@ -251,15 +276,36 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                     />
                 </div>
             )}
+
+            {/* RINGKASAN HARGA */}
             <div className="space-y-1 pt-2">
-                <div className="flex justify-between text-sm"><span>Subtotal</span><span>{formatRupiah(total)}</span></div>
-                {paymentMethod === "Cash" && (
-                    <div className="flex justify-between text-sm font-medium text-green-600"><span>Kembalian</span><span>{formatRupiah(change < 0 ? 0 : change)}</span></div>
+                <div className="flex justify-between text-sm">
+                    <span>Subtotal</span>
+                    <span>{formatRupiah(subTotal)}</span>
+                </div>
+                
+                {Number(discount) > 0 && (
+                     <div className="flex justify-between text-sm text-red-500">
+                        <span>Diskon</span>
+                        <span>- {formatRupiah(Number(discount))}</span>
+                    </div>
                 )}
-                <div className="flex justify-between items-center text-lg font-bold pt-2 border-t"><span>Total Tagihan</span><span className="text-primary">{formatRupiah(total)}</span></div>
+
+                {paymentMethod === "Cash" && (
+                    <div className="flex justify-between text-sm font-medium text-green-600">
+                        <span>Kembalian</span>
+                        <span>{formatRupiah(change < 0 ? 0 : change)}</span>
+                    </div>
+                )}
+                
+                <div className="flex justify-between items-center text-lg font-bold pt-2 border-t">
+                    <span>Total Tagihan</span>
+                    <span className="text-primary">{formatRupiah(finalTotal)}</span>
+                </div>
             </div>
+
             <Button className="w-full h-12 text-lg font-bold shadow-sm" disabled={!isPaymentValid() || isLoading} onClick={handleCheckout}>
-                {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Memproses...</>) : (`Bayar ${formatRupiah(total)}`)}
+                {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Memproses...</>) : (`Bayar ${formatRupiah(finalTotal)}`)}
             </Button>
         </div>
     </div>
@@ -268,7 +314,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
   return (
     <div className={className}>
       
-      {/* MODE MOBILE */}
+      {/* MOBILE */}
       <div className="lg:hidden"> 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <div className='fixed bottom-6 left-0 w-full flex justify-center z-40 px-4'>
@@ -276,7 +322,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                     <Button className="w-full h-14 text-lg rounded-full shadow-2xl bg-primary hover:bg-primary/90 transition-all flex items-center justify-between px-6">
                         <div className="flex items-center gap-2">
                             <ShoppingCart className="h-6 w-6" />
-                            <span className="font-bold">Total: {formatRupiah(total)}</span>
+                            <span className="font-bold">Total: {formatRupiah(finalTotal)}</span>
                         </div>
                         <div className="bg-white text-primary text-xs font-bold px-2 py-1 rounded-full">
                             {items.reduce((acc, item) => acc + item.qty, 0)} Item
@@ -284,7 +330,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                     </Button>
                 </DialogTrigger>
             </div>
-            
             <DialogContent className="sm:max-w-lg w-[95%] rounded-xl flex flex-col max-h-[85vh] p-0 gap-0 overflow-hidden">
                 <DialogHeader className="p-4 border-b bg-slate-50">
                     <DialogTitle className="font-bold flex items-center gap-2 text-base">
@@ -296,7 +341,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
         </Dialog>
       </div>
 
-      {/* MODE DESKTOP */}
+      {/* DESKTOP */}
       <div className="hidden lg:flex flex-col h-full bg-white rounded-xl overflow-hidden border">
           <div className="p-4 border-b bg-slate-50">
             <h2 className="font-bold flex items-center gap-2">
@@ -311,9 +356,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
            <DialogContent className="sm:max-w-md w-[90%] rounded-xl">
             <DialogHeader>
                 <DialogTitle className="text-center flex flex-col items-center gap-2">
-                    <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center text-green-600 animate-in zoom-in">
-                        <Send className="h-6 w-6" />
-                    </div>
                     Transaksi Berhasil!
                 </DialogTitle>
             </DialogHeader>
@@ -322,52 +364,38 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                     <Label className="text-xs text-slate-500 mb-1.5 block">Nomor WhatsApp Pelanggan</Label>
                     <div className="flex gap-2">
                         <Input placeholder="08xxxxxxxxxx" value={manualPhone} onChange={(e) => setManualPhone(e.target.value)} className="bg-white" />
-                        <Button variant="outline" onClick={handleDownloadImage} title="Download" className="border-slate-300 hover:bg-slate-100">
-                            <Download className="h-4 w-4 text-slate-700" />
-                        </Button>
+                        <Button variant="outline" onClick={handleDownloadImage} title="Download"><Download className="h-4 w-4" /></Button>
                     </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 pt-2">
-                    <Button 
-                        variant="outline" 
-                        className="flex flex-col items-center justify-center h-16 gap-1 border-slate-300 hidden md:flex"
-                        onClick={() => handlePrintPC()}
-                    >
-                        <Printer className="h-5 w-5 text-slate-700" />
-                        <span className="text-xs font-normal">Cetak (USB)</span>
+                    <Button variant="outline" className="flex flex-col h-16 hidden md:flex" onClick={() => handlePrintPC()}>
+                        <Printer className="h-5 w-5" /><span className="text-xs">Cetak (USB)</span>
                     </Button>
-                    <Button 
-                        variant="outline" 
-                        className="flex flex-col items-center justify-center h-16 gap-1 border-slate-300 md:hidden"
-                        onClick={handlePrintMobile}
-                    >
-                        <Printer className="h-5 w-5 text-slate-700" />
-                        <span className="text-xs font-normal">Cetak (BT)</span>
+                    <Button variant="outline" className="flex flex-col h-16 md:hidden" onClick={handlePrintMobile}>
+                        <Printer className="h-5 w-5" /><span className="text-xs">Cetak (BT)</span>
                     </Button>
-                    <Button 
-                        className="flex flex-col items-center justify-center h-16 gap-1 bg-green-600 hover:bg-green-700 col-span-2 md:col-span-1"
-                        onClick={handleOpenWhatsApp}
-                    >
-                        <Share2 className="h-5 w-5" />
-                        <span className="text-xs font-normal">Kirim WA</span>
+                    <Button className="flex flex-col h-16 bg-green-600 col-span-2 md:col-span-1" onClick={handleOpenWhatsApp}>
+                        <Share2 className="h-5 w-5" /><span className="text-xs">Kirim WA</span>
                     </Button>
                 </div>
             </div>
             <DialogFooter className="sm:justify-center">
-                <Button variant="ghost" onClick={() => { setShowSuccessDialog(false); setIsOpen(false); }}>
-                    Tutup
-                </Button>
+                <Button variant="ghost" onClick={() => { setShowSuccessDialog(false); setIsOpen(false); }}>Tutup</Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* STRUK UNTUK GENERATE GAMBAR & PRINT */}
-      {/* Jika cart kosong (setelah checkout), gunakan Data Cadangan (lastItems) */}
+      {/* INVISIBLE RECEIPT UNTUK GENERATE & PRINT */}
       <div style={{ position: 'fixed', top: 0, left: '-9999px', zIndex: -50 }}>
         <Receipt 
             ref={receiptRef} 
-            items={items.length > 0 ? items : lastItems}  // <--- LOGIKA PERBAIKAN
-            total={items.length > 0 ? total : lastTotal}  // <--- LOGIKA PERBAIKAN
+            // LOGIKA: Jika keranjang isi, pakai data live. Jika kosong (checkout sukses), pakai data snapshot
+            items={items.length > 0 ? items : lastItems}
+            total={items.length > 0 ? subTotal : lastSubTotal}
+            discount={items.length > 0 ? (Number(discount) || 0) : lastDiscount}
+            paymentMethod={items.length > 0 ? paymentMethod : lastPaymentMethod}
+            cashAmount={items.length > 0 ? (Number(cashReceived) || 0) : lastCashReceived}
+            changeAmount={items.length > 0 ? change : lastChange}
             date={receiptData.date} 
             id={receiptData.id} 
         />

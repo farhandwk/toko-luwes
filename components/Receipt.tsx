@@ -3,40 +3,46 @@ import { formatRupiah } from '@/utils/currency';
 
 interface ReceiptProps {
   items: any[];
-  total: number;
+  total: number;       // Ini adalah Subtotal (Total harga barang)
   date: string;
   id: string;
+  // [BARU] Props Tambahan
+  discount?: number;   // Opsional
+  paymentMethod?: string;
+  cashAmount?: number; // Uang yang diserahkan (untuk Cash)
+  changeAmount?: number; // Kembalian (untuk Cash)
 }
 
-const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ items, total, date, id }, ref) => {
+const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ 
+  items, 
+  total, 
+  date, 
+  id, 
+  discount = 0, 
+  paymentMethod = "Cash",
+  cashAmount = 0,
+  changeAmount = 0
+}, ref) => {
+
+  // Hitung Total Akhir (Subtotal - Diskon)
+  const finalTotal = total - (discount || 0);
+
   return (
     <div 
       ref={ref} 
       className="bg-white text-black print-area"
       style={{ 
         width: '58mm', 
-        padding: '2mm', // Padding body dikurangi biar muat
+        padding: '2mm', 
         fontFamily: "'Courier New', Courier, monospace", 
         fontSize: '10px', 
         lineHeight: '1.2',
         position: 'relative',
-        // DEBUG: Uncomment baris bawah ini jika ingin melihat batas kertas (Garis Merah)
+        // Border Hitam (Sesuai request Boss agar tidak kena crop)
         border: '1px solid black',
         borderRadius: '2px' 
       }}
     >
-      {/* --- TRIK GANJALAN (SPACER) --- */}
-      {/* Kita buat elemen fisik setinggi 1.5cm agar tidak kena auto-crop */}
-      <div style={{ 
-          height: '15mm',              // Tinggi spacer
-          display: 'flex', 
-          alignItems: 'end',           // Posisi di paling bawah
-          justifyContent: 'center',    // Di tengah
-          color: 'black'               // HARUS HITAM (agar terbaca sebagai konten)
-      }}>
-          {/* Titik kecil ini adalah "penyelamat" agar kertas tidak dipotong */}
-          <span className="text-[10px] leading-none opacity-50">.</span> 
-      </div>
       {/* Header */}
       <div className="text-center mb-2">
         <h2 className="font-bold text-sm uppercase">Toko Luwes</h2>
@@ -63,10 +69,52 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ items, total, date, 
 
       <div className="border-b border-dashed border-black my-2"></div>
 
-      {/* Total */}
-      <div className="flex justify-between font-bold text-xs mt-1">
-        <span>TOTAL</span>
-        <span>{formatRupiah(total)}</span>
+      {/* --- BAGIAN KALKULASI HARGA --- */}
+      <div className="flex flex-col gap-1 text-xs">
+        
+        {/* 1. Subtotal (Hanya muncul jika ada diskon, biar jelas) */}
+        {discount > 0 && (
+          <div className="flex justify-between">
+            <span>Subtotal</span>
+            <span>{formatRupiah(total)}</span>
+          </div>
+        )}
+
+        {/* 2. Diskon (Hanya muncul jika diisi) */}
+        {discount > 0 && (
+          <div className="flex justify-between">
+            <span>Diskon</span>
+            <span>-{formatRupiah(discount)}</span>
+          </div>
+        )}
+
+        {/* 3. TOTAL AKHIR (Bold) */}
+        <div className="flex justify-between font-bold text-sm mt-1">
+          <span>TOTAL</span>
+          <span>{formatRupiah(finalTotal)}</span>
+        </div>
+
+        {/* 4. Info Pembayaran (Khusus Cash) */}
+        {paymentMethod === 'Cash' && (
+           <>
+             <div className="flex justify-between mt-1 border-t border-dashed border-gray-400 pt-1">
+               <span>Tunai</span>
+               <span>{formatRupiah(cashAmount)}</span>
+             </div>
+             <div className="flex justify-between font-bold">
+               <span>Kembalian</span>
+               <span>{formatRupiah(changeAmount)}</span>
+             </div>
+           </>
+        )}
+        
+        {/* Info Metode Non-Tunai */}
+        {paymentMethod !== 'Cash' && (
+            <div className="text-right text-[9px] mt-1 italic">
+                Dibayar via {paymentMethod}
+            </div>
+        )}
+
       </div>
       
       {/* Footer Utama */}
@@ -76,20 +124,15 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ items, total, date, 
       </div>
 
       {/* --- TRIK GANJALAN (SPACER) --- */}
-      {/* Kita buat elemen fisik setinggi 1.5cm agar tidak kena auto-crop */}
       <div style={{ 
-          height: '15mm',              // Tinggi spacer
+          height: '15mm',             
           display: 'flex', 
-          alignItems: 'end',           // Posisi di paling bawah
-          justifyContent: 'center',    // Di tengah
-          color: 'black'               // HARUS HITAM (agar terbaca sebagai konten)
+          alignItems: 'end',          
+          justifyContent: 'center',    
+          color: 'black'              
       }}>
-          {/* Titik kecil ini adalah "penyelamat" agar kertas tidak dipotong */}
           <span className="text-[10px] leading-none opacity-50">.</span> 
       </div>
-      
-      {/* Opsi Lain: Garis Penutup (Bisa diaktifkan kalau mau ada tanda batas sobek) */}
-      {/* <div className="border-b border-dashed border-gray-300 w-full mt-2"></div> */}
 
       {/* CSS Print */}
       <style jsx global>{`
