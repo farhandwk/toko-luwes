@@ -26,9 +26,15 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ items, total, date, 
     >
       {/* --- TRIK GANJALAN (SPACER) --- */}
       {/* Kita buat elemen fisik setinggi 1.5cm agar tidak kena auto-crop */}
-      <div style={{ height: '15mm', display: 'flex', alignItems: 'end', justifyContent: 'center' }}>
-          {/* Titik Putih di paling bawah sebagai "Jangkar" agar printer mencetak sampai sini */}
-          <span className="text-white text-[1px]">.</span> 
+      <div style={{ 
+          height: '15mm',              // Tinggi spacer
+          display: 'flex', 
+          alignItems: 'end',           // Posisi di paling bawah
+          justifyContent: 'center',    // Di tengah
+          color: 'black'               // HARUS HITAM (agar terbaca sebagai konten)
+      }}>
+          {/* Titik kecil ini adalah "penyelamat" agar kertas tidak dipotong */}
+          <span className="text-[10px] leading-none opacity-50">.</span> 
       </div>
       {/* Header */}
       <div className="text-center mb-2">
