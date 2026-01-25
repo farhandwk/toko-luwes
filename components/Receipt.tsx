@@ -30,8 +30,17 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
         border: '1px solid black',
       }}
     >
-<div className="h-4 w-full"></div> 
-      
+
+      <div style={{ 
+          height: '15mm',             
+          display: 'flex', 
+          alignItems: 'end',          
+          justifyContent: 'center',    
+          color: 'black'              
+      }}>
+          <span className="text-[1px] leading-none opacity-50">.</span> 
+      </div>
+
       {/* HEADER */}
       <div className="text-center mb-2 border-b-2 border-black pb-2 border-dashed">
         <h1 className="text-xl font-extrabold mb-1">TOKO LUWES</h1>
@@ -109,7 +118,15 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
       </div>
 
       {/* Spacer Bawah */}
-      <div className="h-4 w-full"></div> 
+      <div style={{ 
+          height: '15mm',             
+          display: 'flex', 
+          alignItems: 'end',          
+          justifyContent: 'center',    
+          color: 'black'              
+      }}>
+          <span className="text-[1px] leading-none opacity-50">.</span> 
+      </div> 
     </div>
   );
 });
