@@ -21,7 +21,8 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ items, total, date, 
         lineHeight: '1.2',
         position: 'relative',
         // DEBUG: Uncomment baris bawah ini jika ingin melihat batas kertas (Garis Merah)
-        // border: '1px solid white' 
+        border: '1px solid black',
+        borderRadius: '2px' 
       }}
     >
       {/* --- TRIK GANJALAN (SPACER) --- */}
