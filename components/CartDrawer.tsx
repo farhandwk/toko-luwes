@@ -110,7 +110,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     if (!receiptBlob) { toast.error("Gagal memuat gambar struk"); return; }
     let phone = manualPhone.replace(/\D/g, '');
     if (phone.startsWith('0')) phone = '62' + phone.slice(1);
-    const messageText = encodeURIComponent(`Halo Kak, terima kasih sudah berbelanja.\nBerikut struk transaksinya 👇`);
+    const messageText = encodeURIComponent(`Terima kasih sudah berbelanja di Toko Luwes.\nBerikut struk transaksinya`);
     const waUrl = phone ? `https://wa.me/${phone}?text=${messageText}` : `https://wa.me/?text=${messageText}`;
     const file = new File([receiptBlob], `struk-${lastTxId}.png`, { type: "image/png" });
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);

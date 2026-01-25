@@ -1,8 +1,7 @@
-// app/api/upload/route.ts
-import { NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
+import { NextResponse } from 'next/server';
 
-// Konfigurasi Cloudinary
+// Konfigurasi Cloudinary dari .env
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -15,42 +14,29 @@ export async function POST(request: Request) {
     const file = formData.get('file') as File;
 
     if (!file) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+      return NextResponse.json({ error: 'Tidak ada file yang diupload' }, { status: 400 });
     }
 
-    // Konversi File ke Buffer
+    // Convert file ke Buffer
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const buffer = new Uint8Array(arrayBuffer);
 
-    // Upload ke Cloudinary menggunakan Stream
-    // Kita bungkus dalam Promise agar bisa di-await
-    const uploadResponse: any = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'pos-toko-luwes', // Nama folder di Cloudinary (Opsional)
-          resource_type: 'auto',   // Otomatis deteksi jpg/png
-        },
+    // Upload ke Cloudinary (Promise Wrapper)
+    const result: any = await new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream(
+        { folder: 'pos-toko-luwes' }, // Optional: Folder penyimpanan
         (error, result) => {
           if (error) reject(error);
           else resolve(result);
         }
-      );
-      
-      // Akhiri stream dengan buffer file kita
-      uploadStream.end(buffer);
+      ).end(buffer);
     });
 
-    // Sukses! Kembalikan URL HTTPS yang aman
-    return NextResponse.json({
-      success: true,
-      fileUrl: uploadResponse.secure_url, // URL HTTPS Cloudinary
-    });
+    // Kembalikan Response Full (termasuk secure_url)
+    return NextResponse.json(result);
 
   } catch (error: any) {
-    console.error('Upload Error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Something went wrong' },
-      { status: 500 }
-    );
+    console.error("Upload Error:", error);
+    return NextResponse.json({ error: error.message || 'Gagal upload ke server' }, { status: 500 });
   }
 }
