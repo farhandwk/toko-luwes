@@ -111,11 +111,12 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     let phone = manualPhone.replace(/\D/g, '');
     if (phone.startsWith('0')) phone = '62' + phone.slice(1);
     const messageText = encodeURIComponent(`Terima kasih sudah berbelanja di Toko Luwes.\nBerikut struk transaksinya`);
+    const rawMessage = `Terima kasih sudah berbelanja di Toko Luwes.\nBerikut struk transaksinya 👇`;
     const waUrl = phone ? `https://wa.me/${phone}?text=${messageText}` : `https://wa.me/?text=${messageText}`;
     const file = new File([receiptBlob], `struk-${lastTxId}.png`, { type: "image/png" });
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'Struk Belanja', text: `${messageText}` }); } 
+        try { await navigator.share({ files: [file], title: 'Struk Belanja', text: `${rawMessage}` }); } 
         catch (error) { console.log("Share dibatalkan"); }
     } else { window.open(waUrl, '_blank'); toast.info("WhatsApp terbuka!"); }
   };
