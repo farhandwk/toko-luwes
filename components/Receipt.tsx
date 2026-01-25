@@ -10,22 +10,25 @@ interface ReceiptProps {
 
 const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ items, total, date, id }, ref) => {
   return (
-    // Container Utama: Lebar 58mm, Font Monospace (seperti mesin ketik), Background Putih
+    // [PERBAIKAN] Tambahkan class "print-area" di sini
     <div 
       ref={ref} 
-      className="bg-white text-black p-2"
+      className="bg-white text-black p-2 print-area" // <--- TAMBAHKAN 'print-area'
       style={{ 
-        width: '58mm', // Ukuran kertas thermal 58mm
-        minHeight: '100mm', // Tinggi minimal agar tidak terpotong
-        fontFamily: "'Courier New', Courier, monospace", // Font struk klasik
-        fontSize: '10px', // Ukuran font kecil agar muat
+        width: '58mm', 
+        minHeight: '100mm', 
+        padding: '5mm',        // Jarak aman kiri-kanan-atas
+        paddingBottom: '15mm',
+        paddingTop: '15mm',
+        fontFamily: "'Courier New', Courier, monospace", 
+        fontSize: '10px', 
         lineHeight: '1.2'
       }}
     >
       {/* Header */}
       <div className="text-center mb-2">
         <h2 className="font-bold text-sm uppercase">Toko Luwes</h2>
-        <p className="text-[9px]">Jl. Pacarmulyo, Gondang, Watumalang, Wonsobo</p>
+        <p className="text-[9px]">Jl. Contoh No. 123, Yogyakarta</p>
         <p className="text-[9px] mt-1">{date}</p>
         <p className="text-[9px]">ID: {id}</p>
       </div>
@@ -60,17 +63,16 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ items, total, date, 
         <p>Barang yang dibeli tidak dapat ditukar/dikembalikan</p>
       </div>
 
-      {/* CSS Khusus Print: Sembunyikan header/footer browser saat dicetak */}
+      {/* CSS: Sembunyikan semua KECUALI yang punya class 'print-area' */}
       <style jsx global>{`
         @media print {
           @page {
-            size: 58mm auto; /* Paksa ukuran kertas */
-            margin: 0;       /* Hapus margin browser */
+            size: 58mm auto;
+            margin: 0;
           }
           body * {
-            visibility: hidden; /* Sembunyikan semua elemen web */
+            visibility: hidden;
           }
-          /* Tampilkan HANYA area struk */
           .print-area, .print-area * {
             visibility: visible;
           }

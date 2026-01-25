@@ -23,11 +23,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"; 
 import { Separator } from '@/components/ui/separator';
-// Import Icon Printer
 import { Trash2, ShoppingCart, Plus, Minus, Loader2, Send, Share2, Download, Info, Printer } from 'lucide-react'; 
 import { toast } from "sonner";
 import { toPng } from 'html-to-image';
-// Import Print Utility
 import { useReactToPrint } from 'react-to-print'; 
 import Receipt from './Receipt';
 
@@ -53,6 +51,10 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
   const [manualPhone, setManualPhone] = useState("");
   const [lastTxId, setLastTxId] = useState(""); 
 
+  // [PERBAIKAN] State Cadangan untuk Print Laptop setelah Clear Cart
+  const [lastItems, setLastItems] = useState<any[]>([]);
+  const [lastTotal, setLastTotal] = useState(0);
+
   const change = (paymentMethod === "Cash" && typeof cashReceived === 'number') 
     ? cashReceived - total 
     : 0;
@@ -72,14 +74,14 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     });
   }, [isOpen]);
 
-  // --- FUNGSI PRINT PC (USB) ---
+  // FUNGSI PRINT PC (USB)
   const handlePrintPC = useReactToPrint({
-    contentRef: receiptRef,
+    contentRef: receiptRef, // React-to-print akan mengambil DOM Receipt yang sudah diisi data cadangan
     documentTitle: `Struk-${lastTxId}`,
     onAfterPrint: () => toast.success("Perintah cetak dikirim!"),
   });
 
-  // --- FUNGSI PRINT HP (BLUETOOTH / RAWBT) ---
+  // FUNGSI PRINT HP (BLUETOOTH / RAWBT)
   const handlePrintMobile = () => {
     if (!receiptBlob) {
         toast.error("Sedang memproses gambar struk...");
@@ -90,10 +92,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     reader.onloadend = () => {
         const base64data = reader.result as string;
         const cleanBase64 = base64data.split(',')[1];
-        
-        // [PERBAIKAN] Tambahkan 'data:image/png;base64,' agar RawBT tahu ini GAMBAR
         const rawbtUrl = `rawbt:data:image/png;base64,${cleanBase64}`;
-        
         window.location.href = rawbtUrl;
     };
   };
@@ -141,14 +140,12 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
       if (receiptRef.current) {
         try {
           await new Promise(resolve => setTimeout(resolve, 100));
-          
-          // [FIX] Mengatasi Error Font & Cloudinary
           const dataUrl = await toPng(receiptRef.current, { 
              cacheBust: true, 
              backgroundColor: '#ffffff',
-             filter: (node) => (node.tagName !== 'LINK'), // Skip font links
+             filter: (node) => (node.tagName !== 'LINK'), 
              // @ts-ignore
-             skipFonts: true, // Matikan font embedding
+             skipFonts: true, 
           });
 
           const res = await fetch(dataUrl);
@@ -179,6 +176,11 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
       if (response.ok) {
         toast.success("Transaksi Sukses!");
         setLastTxId(result.transactionId || receiptData.id);
+
+        // [PERBAIKAN] Simpan Data ke State Cadangan Sebelum ClearCart
+        setLastItems(items);
+        setLastTotal(total);
+
         setShowSuccessDialog(true);
         clearCart();
         setCashReceived('');
@@ -190,10 +192,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     } finally { setIsLoading(false); }
   };
 
-  // --- UI ISI KERANJANG (Shared Component) ---
+  // VARIABEL UI CART (Untuk fix focus input)
   const cartContent = (
     <div className="flex flex-col h-full overflow-hidden">
-        {/* List Item */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
             {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-400">
@@ -225,7 +226,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
             )}
         </div>
         
-        {/* Footer Pembayaran */}
         <div className="bg-white p-4 space-y-4 border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10 relative">
             <div className="space-y-2">
                 <Label>Metode Pembayaran</Label>
@@ -247,7 +247,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                         value={cashReceived} 
                         onChange={(e) => setCashReceived(Number(e.target.value))} 
                         className="text-right text-lg font-mono font-bold" 
-                        autoFocus={false} // Pastikan autofocus false agar tidak lompat
+                        autoFocus={false} 
                     />
                 </div>
             )}
@@ -291,10 +291,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                         <ShoppingCart className="h-5 w-5" /> Keranjang Belanja
                     </DialogTitle>
                 </DialogHeader>
-
-                {/* PANGGIL VARIABEL DI SINI (BUKAN COMPONENT) */}
                 {cartContent} 
-
             </DialogContent>
         </Dialog>
       </div>
@@ -306,15 +303,11 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                 <ShoppingCart className="h-5 w-5" /> Keranjang Belanja
             </h2>
           </div>
-          
-          {/* PANGGIL VARIABEL DI SINI JUGA */}
           {cartContent}
-          
       </div>
 
-      {/* ... Dialog Sukses & Receipt tetap sama ... */}
+      {/* DIALOG SUKSES */}
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-          {/* ... isi dialog sukses tidak berubah ... */}
            <DialogContent className="sm:max-w-md w-[90%] rounded-xl">
             <DialogHeader>
                 <DialogTitle className="text-center flex flex-col items-center gap-2">
@@ -324,9 +317,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                     Transaksi Berhasil!
                 </DialogTitle>
             </DialogHeader>
-            
             <div className="space-y-3 py-2">
-                {/* 1. INPUT WA */}
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                     <Label className="text-xs text-slate-500 mb-1.5 block">Nomor WhatsApp Pelanggan</Label>
                     <div className="flex gap-2">
@@ -336,10 +327,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                         </Button>
                     </div>
                 </div>
-
-                {/* 2. GRID TOMBOL AKSI */}
                 <div className="grid grid-cols-2 gap-3 pt-2">
-                    {/* CETAK PC */}
                     <Button 
                         variant="outline" 
                         className="flex flex-col items-center justify-center h-16 gap-1 border-slate-300 hidden md:flex"
@@ -348,8 +336,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                         <Printer className="h-5 w-5 text-slate-700" />
                         <span className="text-xs font-normal">Cetak (USB)</span>
                     </Button>
-
-                    {/* CETAK HP (BLUETOOTH) */}
                     <Button 
                         variant="outline" 
                         className="flex flex-col items-center justify-center h-16 gap-1 border-slate-300 md:hidden"
@@ -358,8 +344,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                         <Printer className="h-5 w-5 text-slate-700" />
                         <span className="text-xs font-normal">Cetak (BT)</span>
                     </Button>
-                    
-                    {/* KIRIM WA */}
                     <Button 
                         className="flex flex-col items-center justify-center h-16 gap-1 bg-green-600 hover:bg-green-700 col-span-2 md:col-span-1"
                         onClick={handleOpenWhatsApp}
@@ -369,7 +353,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                     </Button>
                 </div>
             </div>
-
             <DialogFooter className="sm:justify-center">
                 <Button variant="ghost" onClick={() => { setShowSuccessDialog(false); setIsOpen(false); }}>
                     Tutup
@@ -377,8 +360,17 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
             </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* STRUK UNTUK GENERATE GAMBAR & PRINT */}
+      {/* Jika cart kosong (setelah checkout), gunakan Data Cadangan (lastItems) */}
       <div style={{ position: 'fixed', top: 0, left: '-9999px', zIndex: -50 }}>
-        <Receipt ref={receiptRef} items={items} total={total} date={receiptData.date} id={receiptData.id} />
+        <Receipt 
+            ref={receiptRef} 
+            items={items.length > 0 ? items : lastItems}  // <--- LOGIKA PERBAIKAN
+            total={items.length > 0 ? total : lastTotal}  // <--- LOGIKA PERBAIKAN
+            date={receiptData.date} 
+            id={receiptData.id} 
+        />
       </div>
     </div>
   );
