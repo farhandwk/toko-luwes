@@ -92,10 +92,10 @@ export default function Home() {
     });
 
     // Jika ada harga yang beda, update store
-    if (hasChanges) {
-        updateCartItems(updatedItems);
-        toast.info("Harga keranjang disesuaikan dengan jenis pelanggan.");
-    }
+    // if (hasChanges) {
+    //     updateCartItems(updatedItems);
+    //     toast.info("Harga keranjang disesuaikan dengan jenis pelanggan.");
+    // }
 
   }, [selectedGroupId, prices, products, items, updateCartItems]); 
 
@@ -130,13 +130,13 @@ export default function Home() {
                 </div>
                 <div>
                   <h1 className="text-xl md:text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    <ShoppingBag className="h-6 w-6 text-primary" /> Toko Luwes
+                    <ShoppingBag className="h-6 w-6 text-primary" /> TOKO LUWES
                   </h1>
                   <p className="text-xs text-slate-500">Kasir Point of Sales</p>
                 </div>
               </div>
 
-              <nav className="hidden lg:flex items-center gap-1 ml-4 border-l pl-4 h-10">
+              <nav className="hidden lg:flex flex-wrap items-center gap-1 ml-4 border-l pl-4 h-auto">
                  <Link href="/transactions">
                     <Button variant="ghost" className="flex items-center gap-2 text-slate-600">
                         <History className="h-4 w-4" /> Riwayat
@@ -148,6 +148,13 @@ export default function Home() {
                         <Settings className="h-4 w-4" /> Pengaturan
                     </Button>
                  </Link>
+
+                 <Link href="/admin/products">
+                    <Button variant="ghost" className="w-full justify-start h-12 text-base font-normal">
+                        <Settings className="mr-3 h-5 w-5 text-slate-600" /> 
+                        Manajemen Produk
+                    </Button>
+                </Link>
 
                  <Link href="/admin/grosir">
                     <Button variant="ghost" className="flex items-center gap-2 text-slate-600">

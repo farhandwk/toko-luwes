@@ -41,6 +41,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [manualPhone, setManualPhone] = useState("");
   const [lastTxId, setLastTxId] = useState(""); 
+  
+  // [FIX HYDRATION] State untuk memastikan komponen sudah dimount di client
+  const [isMounted, setIsMounted] = useState(false);
 
   // STATE SNAPSHOT (Untuk Struk)
   const [lastItems, setLastItems] = useState<any[]>([]);
@@ -62,11 +65,12 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
   };
 
   useEffect(() => {
+    // [FIX HYDRATION] Set mounted ke true setelah render pertama di client
+    setIsMounted(true);
     setReceiptData({ id: `TRX-${Date.now()}`, date: getWIBDate() });
   }, [isOpen]);
 
-  // --- HANDLER INPUT YANG AMAN ---
-  // Kita pastikan value kosong ('') ditangani dengan benar agar tidak jadi angka 0 tiba-tiba
+  // --- HANDLER INPUT ---
   const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       setDiscount(val === '' ? '' : Number(val));
@@ -110,15 +114,30 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     if (!receiptBlob) { toast.error("Gagal memuat gambar struk"); return; }
     let phone = manualPhone.replace(/\D/g, '');
     if (phone.startsWith('0')) phone = '62' + phone.slice(1);
-    const messageText = encodeURIComponent(`Terima kasih sudah berbelanja di Toko Luwes.\nBerikut struk transaksinya`);
+    
+    // Pesan Murni (Tanpa %20) untuk navigator.share (HP)
     const rawMessage = `Terima kasih sudah berbelanja di Toko Luwes.\nBerikut struk transaksinya 👇`;
-    const waUrl = phone ? `https://wa.me/${phone}?text=${messageText}` : `https://wa.me/?text=${messageText}`;
+    
+    // Pesan Encoded (Dengan %20) untuk WA Web (PC)
+    const encodedMessage = encodeURIComponent(rawMessage);
+    const waUrl = phone ? `https://wa.me/${phone}?text=${encodedMessage}` : `https://wa.me/?text=${encodedMessage}`;
+
     const file = new File([receiptBlob], `struk-${lastTxId}.png`, { type: "image/png" });
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
     if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'Struk Belanja', text: `${rawMessage}` }); } 
+        try { 
+            await navigator.share({ 
+                files: [file], 
+                title: 'Struk Belanja', 
+                text: rawMessage
+            }); 
+        } 
         catch (error) { console.log("Share dibatalkan"); }
-    } else { window.open(waUrl, '_blank'); toast.info("WhatsApp terbuka!"); }
+    } else { 
+        window.open(waUrl, '_blank'); 
+        toast.info("WhatsApp terbuka!"); 
+    }
   };
 
   const handleCheckout = async () => {
@@ -153,9 +172,11 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     } catch (error) { console.error(error); toast.error("Gagal Checkout"); } finally { setIsLoading(false); }
   };
 
-  // --- KITA HAPUS DEFINISI COMPONENT INTERNAL DI SINI ---
-  // Konten HTML (JSX) sekarang langsung dimasukkan ke dalam return di bawah
-  // agar React tidak bingung dan tidak me-reset input Anda.
+  // Jika belum mounted (masih di server / loading awal), jangan tampilkan angka Rupiah dulu
+  // Ini untuk mencegah error Hydration Mismatch
+  if (!isMounted) {
+      return <div className={className}></div>; // Render kosong dulu
+  }
 
   return (
     <div className={className}>
@@ -166,7 +187,11 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
             <div className='fixed bottom-6 left-0 w-full flex justify-center z-40 px-4'>
                 <DialogTrigger asChild>
                     <Button className="w-full h-14 text-lg rounded-full shadow-2xl bg-primary hover:bg-primary/90 transition-all flex items-center justify-between px-6">
-                        <div className="flex items-center gap-2"><ShoppingCart className="h-6 w-6" /><span className="font-bold">{formatRupiah(finalTotal)}</span></div>
+                        <div className="flex items-center gap-2">
+                            <ShoppingCart className="h-6 w-6" />
+                            {/* Pastikan ini render setelah mounted */}
+                            <span className="font-bold">{formatRupiah(finalTotal)}</span>
+                        </div>
                         <div className="bg-white text-primary text-xs font-bold px-2 py-1 rounded-full">{items.reduce((acc, item) => acc + item.qty, 0)} Item</div>
                     </Button>
                 </DialogTrigger>
@@ -240,7 +265,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
         </Dialog>
       </div>
 
-      {/* --- TAMPILAN DESKTOP (FIXED: KUNCI FLEXBOX + ANTI RE-RENDER) --- */}
+      {/* --- TAMPILAN DESKTOP --- */}
       <div className="hidden lg:flex flex-col absolute top-4 right-4 w-96 bg-white rounded-xl border shadow-2xl z-50 max-h-[78vh]">
           
           {/* Header (Fixed) */}

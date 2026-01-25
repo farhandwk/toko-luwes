@@ -19,7 +19,7 @@ import {
   Package, 
   Home,
   RefreshCw,
-  BarChart3 // Import Icon Chart
+  BarChart3, FolderTree, ChartArea // Import Icon Chart
 } from 'lucide-react';
 import { Separator } from './ui/separator';
 
@@ -77,6 +77,15 @@ export default function MobileSidebar({ onRefresh }: MobileSidebarProps) {
             </SheetClose>
 
             <SheetClose asChild>
+              <Link href="/admin/settings">
+                  <Button variant="ghost" className="w-full justify-start h-12 text-base font-normal">
+                      <Settings className="mr-3 h-5 w-5 text-slate-600" /> 
+                      Pengaturan Data
+                  </Button>
+              </Link>
+          </SheetClose>
+
+            <SheetClose asChild>
                 <Link href="/admin/products">
                     <Button variant="ghost" className="w-full justify-start h-12 text-base font-normal">
                         <Settings className="mr-3 h-5 w-5 text-slate-600" /> 
@@ -86,15 +95,21 @@ export default function MobileSidebar({ onRefresh }: MobileSidebarProps) {
             </SheetClose>
 
             <SheetClose asChild>
-              <Link href="/admin/settings">
-                  <Button variant="ghost" className="w-full justify-start h-12 text-base font-normal">
-                      <Settings className="mr-3 h-5 w-5 text-slate-600" /> 
-                      Pengaturan Data
-                  </Button>
-              </Link>
-          </SheetClose>
+                <Link href="/admin/grosir">
+                    <Button variant="ghost" className="flex items-center gap-2 text-slate-600">
+                        <FolderTree className="h-4 w-4" /> Pengaturan Harga Grosir
+                    </Button>
+                 </Link>
+            </SheetClose>
+            
+            <SheetClose asChild>
+                <Link href="/admin/analytics">
+                    <Button variant="ghost" className="flex items-center gap-2 text-slate-600">
+                        <ChartArea className="h-4 w-4" /> Analytics
+                    </Button>
+                    </Link>
+            </SheetClose>
 
-            <Separator className="my-2" />
 
             <SheetClose asChild>
                 <Button 
