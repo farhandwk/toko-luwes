@@ -32,24 +32,24 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
     >
 
       <div style={{ 
-          height: '15mm',             
-          display: 'flex', 
-          alignItems: 'end',          
-          justifyContent: 'center',    
-          color: 'black'              
-      }}>
-          <span className="text-[1px] leading-none opacity-50">.</span> 
-      </div>
+         height: '15mm',  
+          display: 'flex', 
+          alignItems: 'end', 
+           justifyContent: 'center', 
+           color: 'black' 
+        }}>
+           <span className="text-[1px] leading-none opacity-50">.</span> 
+    </div>
 
       {/* HEADER */}
       <div className="text-center mb-2 border-b-2 border-black pb-2 border-dashed">
         <h1 className="text-xl font-extrabold mb-1">TOKO LUWES</h1>
-        <p className="text-[10px] font-normal">Jalan Raya Utama No. 123</p>
-        <p className="text-[10px] font-normal">Telp: 0812-3456-7890</p>
+        <p className="text-[10px] font-bold">Jalan Raya Utama No. 123</p>
+        <p className="text-[10px] font-bold">Telp: 0812-3456-7890</p>
       </div>
 
       {/* INFO TRANSAKSI */}
-      <div className="flex justify-between text-[10px] mb-2 font-normal">
+      <div className="flex justify-between text-[10px] mb-2 font-bold">
         <span>{date}</span>
         <span>{id}</span>
       </div>
@@ -66,13 +66,13 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
 
             {/* 2. LABEL KHUSUS (Di baris baru agar aman) */}
             {item.isSpecial && (
-                 <span className="text-[10px] italic font-normal text-slate-800 -mt-0.5 mb-0.5">
+                 <span className="text-[10px] italic font-bold text-slate-800 -mt-0.5 mb-0.5">
                    ** Harga Khusus **
                  </span>
             )}
 
             {/* 3. QTY & HARGA (Di baris bawahnya) */}
-            <div className="flex justify-between font-normal">
+            <div className="flex justify-between font-bold">
               <span>{item.qty} x {formatRupiah(item.price)}</span>
               <span>{formatRupiah(item.price * item.qty)}</span>
             </div>
@@ -118,15 +118,15 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
       </div>
 
       {/* Spacer Bawah */}
-      <div style={{ 
-          height: '15mm',             
-          display: 'flex', 
-          alignItems: 'end',          
-          justifyContent: 'center',    
-          color: 'black'              
-      }}>
-          <span className="text-[1px] leading-none opacity-50">.</span> 
-      </div> 
+     <div style={{ 
+         height: '15mm',  
+          display: 'flex', 
+          alignItems: 'end', 
+           justifyContent: 'center', 
+           color: 'black' 
+        }}>
+           <span className="text-[1px] leading-none opacity-50">.</span> 
+    </div>
     </div>
   );
 });

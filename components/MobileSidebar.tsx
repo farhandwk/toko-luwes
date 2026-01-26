@@ -24,7 +24,7 @@ import {
 import { Separator } from './ui/separator';
 
 interface MobileSidebarProps {
-  onRefresh: () => void;
+  onRefresh? : () => void;
 }
 
 export default function MobileSidebar({ onRefresh }: MobileSidebarProps) {
@@ -97,7 +97,7 @@ export default function MobileSidebar({ onRefresh }: MobileSidebarProps) {
             <SheetClose asChild>
                 <Link href="/admin/grosir">
                     <Button variant="ghost" className="w-full justify-start h-12 text-base font-normal">
-                        <FolderTree className="h-4 w-4" /> Pengaturan Harga Grosir
+                        <FolderTree className="mr-3 h-5 w-5 text-slate-600" /> Pengaturan Harga Grosir
                     </Button>
                  </Link>
             </SheetClose>
@@ -105,7 +105,7 @@ export default function MobileSidebar({ onRefresh }: MobileSidebarProps) {
             <SheetClose asChild>
                 <Link href="/admin/analytics">
                     <Button variant="ghost" className="w-full justify-start h-12 text-base font-normal">
-                        <ChartArea className="h-4 w-4" /> Analytics
+                        <ChartArea className="mr-3 h-5 w-5 text-slate-600" /> Analytics
                     </Button>
                     </Link>
             </SheetClose>

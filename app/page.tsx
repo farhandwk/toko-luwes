@@ -92,10 +92,10 @@ export default function Home() {
     });
 
     // Jika ada harga yang beda, update store
-    // if (hasChanges) {
-    //     updateCartItems(updatedItems);
-    //     toast.info("Harga keranjang disesuaikan dengan jenis pelanggan.");
-    // }
+    if (hasChanges) {
+        updateCartItems(updatedItems);
+        // toast.info("Harga keranjang disesuaikan dengan jenis pelanggan.");
+    }
 
   }, [selectedGroupId, prices, products, items, updateCartItems]); 
 

@@ -28,8 +28,8 @@ export default function AnalyticsPage() {
         ]);
         const dataTrx = await resTrx.json();
         const dataProd = await resProd.json();
-        setTransactions(dataTrx);
-        setProducts(dataProd);
+        setTransactions(Array.isArray(dataTrx) ? dataTrx : []);
+        setProducts(Array.isArray(dataProd) ? dataProd : []);
       } catch (error) {
         console.error("Gagal load analytics", error);
       } finally {
@@ -46,30 +46,56 @@ export default function AnalyticsPage() {
     const productSales: Record<string, number> = {};
     const paymentMethods: Record<string, number> = {};
 
+    // [HELPER 1] Parsing Tanggal Indonesia (DD/MM/YYYY) ke Object Date JS
+    const parseTransactionDate = (dateStr: string) => {
+        if (!dateStr) return null;
+        try {
+            // Format di Sheet: "26/01/2026, 8:02:47"
+            // Ambil bagian tanggal saja: "26/01/2026"
+            const datePart = dateStr.split(',')[0].trim(); 
+            const parts = datePart.split('/'); // ["26", "01", "2026"]
+            
+            if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1; // JS Month mulai dari 0
+                const year = parseInt(parts[2], 10);
+                return new Date(year, month, day);
+            }
+            
+            // Fallback jika formatnya sudah ISO
+            const isoDate = new Date(dateStr);
+            return isNaN(isoDate.getTime()) ? null : isoDate;
+        } catch (e) {
+            return null;
+        }
+    };
+
+    // [HELPER 2] Format ke Key String YYYY-MM-DD
+    const getLocalDateKey = (dateObj: Date) => {
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     // 1. ITERASI TRANSAKSI
     transactions.forEach((trx) => {
-        // A. Revenue
         const total = Number(trx.total) || 0;
         totalRevenue += total;
 
-        // B. Normalisasi Tanggal (PENTING!)
-        try {
-            // Cek apakah trx.date valid
-            const dateObj = new Date(trx.date);
-            if (!isNaN(dateObj.getTime())) {
-                // Format YYYY-MM-DD agar mudah dicocokkan
-                const dateKey = dateObj.toISOString().split('T')[0];
-                salesByDate[dateKey] = (salesByDate[dateKey] || 0) + total;
-            }
-        } catch (e) {
-            // Skip tanggal error
+        // PARSING TANGGAL YANG LEBIH KUAT
+        const dateObj = parseTransactionDate(trx.date);
+
+        if (dateObj) {
+            const dateKey = getLocalDateKey(dateObj);
+            salesByDate[dateKey] = (salesByDate[dateKey] || 0) + total;
         }
 
-        // C. Payment Method
+        // Payment Method
         const method = trx.paymentMethod || "Cash";
         paymentMethods[method] = (paymentMethods[method] || 0) + 1;
 
-        // D. Produk Terlaris
+        // Produk Terlaris
         let items: any[] = [];
         try {
             if (Array.isArray(trx.items)) items = trx.items;
@@ -79,32 +105,31 @@ export default function AnalyticsPage() {
         if (Array.isArray(items)) {
             items.forEach((item: any) => {
                 const qty = Number(item.qty) || 0;
-                productSales[item.name] = (productSales[item.name] || 0) + qty;
+                const cleanName = item.name.trim(); 
+                productSales[cleanName] = (productSales[cleanName] || 0) + qty;
                 totalItemsSold += qty;
             });
         }
     });
 
-    // 2. GENERATE GRAFIK 7 HARI TERAKHIR (URUT & LENGKAP)
+    // 2. GENERATE GRAFIK 7 HARI TERAKHIR
     const graphData = [];
     const today = new Date();
-    // Loop dari H-6 sampai Hari Ini (7 iterasi)
+    
     for (let i = 6; i >= 0; i--) {
         const d = new Date(today);
         d.setDate(today.getDate() - i);
         
-        const dateKey = d.toISOString().split('T')[0]; // YYYY-MM-DD (Kunci Pencarian)
-        // Label Tampilan (misal: 25 Jan)
+        const dateKey = getLocalDateKey(d);
         const dateLabel = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 
         graphData.push({
             name: dateLabel,
-            // Jika ada data di tanggal itu pakai, jika tidak 0
             total: salesByDate[dateKey] || 0 
         });
     }
 
-    // 3. Format Data Lain
+    // 3. Data Lainnya
     const topProducts = Object.keys(productSales)
         .map(name => ({ name, qty: productSales[name] }))
         .sort((a, b) => b.qty - a.qty)
@@ -122,7 +147,7 @@ export default function AnalyticsPage() {
         totalTransactions: transactions.length,
         totalItemsSold,
         averageOrderValue: transactions.length > 0 ? totalRevenue / transactions.length : 0,
-        graphData, // Data grafik yang sudah rapi
+        graphData, 
         topProducts,
         paymentData,
         lowStockProducts
