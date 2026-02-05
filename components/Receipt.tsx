@@ -10,10 +10,11 @@ interface ReceiptProps {
   changeAmount: number;
   date: string;
   id: string;
+  logoUrl: string;
 }
 
 const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
-  const { items, total, discount, paymentMethod, cashAmount, changeAmount, date, id } = props;
+  const { items, total, discount, paymentMethod, cashAmount, changeAmount, date, id, logoUrl } = props;
 
   return (
     <div 
@@ -22,7 +23,7 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
       style={{ 
         width: '58mm', 
         padding: '5px 2px', // Padding secukupnya
-        fontFamily: "'Courier New', Courier, monospace", 
+        fontFamily: "'sans-serif", 
         fontSize: '12px', // [REQUEST BOSS] Font tetap 12px
         fontWeight: '600', // Agak tebal biar jelas di thermal printer
         lineHeight: '1.3', // Jarak antar baris sedikit direnggangkan biar tidak numpuk
@@ -30,7 +31,6 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
         border: '1px solid black',
       }}
     >
-
       <div style={{ 
          height: '15mm',  
           display: 'flex', 
@@ -42,14 +42,28 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
     </div>
 
       {/* HEADER */}
-      <div className="text-center mb-2 border-b-2 border-black pb-2 border-dashed">
-        <h1 className="text-xl font-extrabold mb-1">TOKO LUWES</h1>
-        <p className="text-[10px] font-bold">Jalan Raya Utama No. 123</p>
-        <p className="text-[10px] font-bold">Telp: 0812-3456-7890</p>
+      <div className="text-center mb-2 border-b-2 border-black pb-2 border-dashed flex flex-col justify-center items-center">
+        <img 
+            src={logoUrl || "/toko-luwes.png"} 
+            alt="Logo Toko" 
+            style={{ 
+                maxWidth: '20mm', // Maksimal 40mm agar tidak mepet pinggir
+                height: 'auto',   // Tinggi menyesuaikan
+                marginBottom: '10px',
+                // [TIPS] Filter ini memaksa gambar jadi hitam putih tajam
+                filter: 'grayscale(100%) contrast(150%)', 
+                display: 'block'
+            }}
+            // Handler jika gambar tidak ditemukan, sembunyikan elemennya
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+        {/* <h1 className="text-xl font-extrabold mb-1">TOKO LUWES</h1> */}
+        <p className="text-[10px] font-bold">Jl. Pacarmulyo, Gondang, Watumalang, Wonosobo</p>
+        <p className="text-[10px] font-normal">Telp: 0852-2679-0465</p>
       </div>
 
       {/* INFO TRANSAKSI */}
-      <div className="flex justify-between text-[10px] mb-2 font-bold">
+      <div className="flex justify-between text-[10px] mb-2 font-normal">
         <span>{date}</span>
         <span>{id}</span>
       </div>
@@ -72,7 +86,7 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
             )}
 
             {/* 3. QTY & HARGA (Di baris bawahnya) */}
-            <div className="flex justify-between font-bold">
+            <div className="flex justify-between font-normal">
               <span>{item.qty} x {formatRupiah(item.price)}</span>
               <span>{formatRupiah(item.price * item.qty)}</span>
             </div>
@@ -99,7 +113,7 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
         </div>
       </div>
 
-      <div className="space-y-1 mb-6 text-[11px]">
+      <div className="space-y-1 mb-6 text-[11px] font-normal">
         <div className="flex justify-between">
           <span>Bayar ({paymentMethod})</span>
           <span>{paymentMethod === 'Cash' ? formatRupiah(cashAmount) : '-'}</span>
@@ -112,7 +126,7 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
         )}
       </div>
 
-      <div className="text-center text-[10px]">
+      <div className="text-center text-[10px] font-normal">
         <p>Terima Kasih</p>
         <p>Barang beli tidak dapat ditukar</p>
       </div>
