@@ -32,7 +32,7 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
       }}
     >
       <div style={{ 
-         height: '15mm',  
+         height: '5mm',  
           display: 'flex', 
           alignItems: 'end', 
            justifyContent: 'center', 
@@ -133,7 +133,7 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
 
       {/* Spacer Bawah */}
      <div style={{ 
-         height: '15mm',  
+         height: '5mm',  
           display: 'flex', 
           alignItems: 'end', 
            justifyContent: 'center', 
