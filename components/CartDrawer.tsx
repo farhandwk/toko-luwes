@@ -357,7 +357,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
       </Dialog>
 
       <div style={{ position: 'fixed', top: 0, left: '-9999px', zIndex: -50 }}>
-        <Receipt ref={receiptRef} items={items.length > 0 ? items : lastItems} total={items.length > 0 ? subTotal : lastSubTotal} discount={items.length > 0 ? (Number(discount) || 0) : lastDiscount} paymentMethod={items.length > 0 ? paymentMethod : lastPaymentMethod} cashAmount={items.length > 0 ? (Number(cashReceived) || 0) : lastCashReceived} changeAmount={items.length > 0 ? change : lastChange} date={receiptData.date} id={receiptData.id} />
+        <Receipt ref={receiptRef} items={items.length > 0 ? items : lastItems} subtotal={items.length > 0 ? subTotal : lastSubTotal} total={items.length > 0 ? finalTotal : (lastSubTotal - lastDiscount)} discount={items.length > 0 ? (Number(discount) || 0) : lastDiscount} paymentMethod={items.length > 0 ? paymentMethod : lastPaymentMethod} cashAmount={items.length > 0 ? (Number(cashReceived) || 0) : lastCashReceived} changeAmount={items.length > 0 ? change : lastChange} date={receiptData.date} id={receiptData.id} />
       </div>
     </div>
   );

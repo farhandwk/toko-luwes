@@ -4,17 +4,18 @@ import { formatRupiah } from '@/utils/currency';
 interface ReceiptProps {
   items: any[];
   total: number;
+  subtotal: number;
   discount: number;
   paymentMethod: string;
   cashAmount: number;
   changeAmount: number;
   date: string;
   id: string;
-  logoUrl: string;
+  logoUrl?: string;
 }
 
 const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
-  const { items, total, discount, paymentMethod, cashAmount, changeAmount, date, id, logoUrl } = props;
+  const { items, subtotal, total, discount, paymentMethod, cashAmount, changeAmount, date, id, logoUrl } = props;
 
   return (
     <div 
@@ -99,7 +100,7 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
       <div className="space-y-1 mb-4 border-b-2 border-black pb-2 border-dashed">
         <div className="flex justify-between font-bold">
           <span>Subtotal</span>
-          <span>{formatRupiah(total + discount)}</span>
+          <span>{formatRupiah(subtotal)}</span>
         </div>
         {discount > 0 && (
           <div className="flex justify-between text-[10px]">
