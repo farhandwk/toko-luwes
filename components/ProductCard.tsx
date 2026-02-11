@@ -19,6 +19,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
   // URL Placeholder yang valid (mengembalikan gambar, bukan JSON)
   const placeholderImage = "https://placehold.co/600x400/e2e8f0/1e293b?text=No+Image";
 
+  const optimizeCloudinaryUrl = (url: string) => {
+    if (!url || !url.includes('cloudinary.com')) return url;
+    return url.replace('/upload/', '/upload/q_auto,f_auto/');
+  };
+
   return (
     <Card className={`flex flex-col justify-between transition-all hover:shadow-lg ${isOutOfStock ? 'opacity-60' : ''} h-full`}>
       <CardHeader className="p-4 pb-2">
@@ -46,7 +51,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
         {/* WRAPPER GAMBAR: Penting agar rasio gambar konsisten */}
         <div className="relative w-full aspect-[4/3] bg-slate-100 rounded-md overflow-hidden mb-3">
             <img 
-                src={product.image || placeholderImage} 
+                src={optimizeCloudinaryUrl(product.image) || placeholderImage} 
                 alt={product.name}
                 className="h-full w-full object-cover transition-transform hover:scale-105"
                 onError={(e) => {

@@ -172,6 +172,12 @@ export default function AdminProducts() {
       setIsRestockOpen(true);
   };
 
+  const optimizeCloudinaryUrl = (url: string) => {
+    if (!url || !url.includes('cloudinary.com')) return url;
+    return url.replace('/upload/', '/upload/q_auto,f_auto/');
+  };
+
+
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -230,7 +236,7 @@ export default function AdminProducts() {
                             <TableCell className="font-medium">
                                 <div className="flex items-center gap-3">
                                     {p.image ? (
-                                        <img src={p.image} alt={p.name} className="h-10 w-10 rounded object-cover border bg-slate-100" />
+                                        <img src={optimizeCloudinaryUrl(p.image)} alt={p.name} className="h-10 w-10 rounded object-cover border bg-slate-100" />
                                     ) : (
                                         <div className="h-10 w-10 rounded bg-slate-100 border flex items-center justify-center text-slate-400"><ImageIcon className="h-4 w-4" /></div>
                                     )}
