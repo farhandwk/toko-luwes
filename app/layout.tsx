@@ -1,5 +1,5 @@
 // app/layout.tsx
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Lato } from "next/font/google";
 import "./globals.css";
@@ -9,10 +9,27 @@ const inter = Inter({ subsets: ["latin"] });
 
 const openSans = Lato({ subsets: ["latin"], weight: ["700"] })
 
+export const viewport: Viewport = {
+  themeColor: "#ffffff",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false
+}
+
 export const metadata: Metadata = {
-  title: "POS Toko",
+  title: "Toko Luwes Cashier",
   description: "Point of Sales System",
-  manifest: "/manifest.json", 
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/icons/android-chrome-512x512.png", // Logo khusus jika di-install di iPhone/iPad
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Toko Luwes",
+  }, 
 };
 
 export default function RootLayout({
