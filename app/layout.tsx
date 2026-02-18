@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   icons: {
     icon: "/favicon.ico",
-    apple: "/icons/android-chrome-512x512.png", // Logo khusus jika di-install di iPhone/iPad
+    apple: "/logo/512.png", // Logo khusus jika di-install di iPhone/iPad
   },
   appleWebApp: {
     capable: true,
