@@ -20,67 +20,61 @@ export default function SettingsPage() {
   const [loadingAction, setLoadingAction] = useState(false);
 
   // FETCH DATA
+  // --- [REVISI FETCH DATA] ---
   async function fetchData() {
     try {
-        const [resCat, resUnit] = await Promise.all([
-            fetch('/api/attributes?type=categories'),
-            fetch('/api/attributes?type=units')
-        ]);
-        
-        const dataCat = await resCat.json();
-        const dataUnit = await resUnit.json();
+      // Cukup satu kali fetch karena API sudah mengirimkan paket lengkap
+      const res = await fetch('/api/attributes');
+      const data = await res.json();
 
-        // [PERBAIKAN] Cek apakah datanya Array? Kalau bukan (error), pakai []
-        if (Array.isArray(dataCat)) {
-            setCategories(dataCat);
-        } else {
-            console.error("Error Categories:", dataCat);
-            setCategories([]); 
-        }
-
-        if (Array.isArray(dataUnit)) {
-            setUnits(dataUnit);
-        } else {
-            console.error("Error Units:", dataUnit);
-            setUnits([]);
-        }
-
+      if (res.ok) {
+        // Ambil array dari dalam properti objek
+        setCategories(data.categories || []);
+        setUnits(data.units || []);
+      } else {
+        console.error("Gagal memuat atribut:", data.error);
+        toast.error("Gagal mengambil data dari server");
+      }
     } catch (e) { 
-        toast.error("Gagal ambil data");
-        setCategories([]);
-        setUnits([]);
+      console.error("Fetch Error:", e);
+      toast.error("Terjadi kesalahan koneksi");
     } finally { 
-        setLoading(false); 
+      setLoading(false); 
     }
   }
 
   useEffect(() => { fetchData(); }, []);
 
-  // ADD FUNCTION
+  // --- [ADD & DELETE TETAP SAMA KARENA API POST/DELETE MASIH MENGGUNAKAN TYPE] ---
   const handleAdd = async (type: 'categories' | 'units', value: string) => {
       if (!value.trim()) return;
       setLoadingAction(true);
       try {
           const res = await fetch('/api/attributes', {
               method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ type, name: value })
           });
           if (res.ok) {
               toast.success("Berhasil ditambah!");
               if (type === 'categories') setNewCat(""); else setNewUnit("");
-              fetchData();
+              fetchData(); // Refresh data
           }
       } catch (e) { toast.error("Gagal simpan"); }
       finally { setLoadingAction(false); }
   };
 
-  // DELETE FUNCTION
   const handleDelete = async (type: 'categories' | 'units', id: string) => {
       if(!confirm("Yakin hapus?")) return;
       try {
-          await fetch(`/api/attributes?type=${type}&id=${id}`, { method: 'DELETE' });
-          toast.success("Dihapus");
-          fetchData();
+          // DELETE tetap menggunakan query params sesuai route.ts yang baru
+          const res = await fetch(`/api/attributes?type=${type}&id=${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            toast.success("Dihapus");
+            fetchData(); // Refresh data
+          } else {
+            throw new Error();
+          }
       } catch (e) { toast.error("Gagal hapus"); }
   };
 

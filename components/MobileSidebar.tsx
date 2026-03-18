@@ -61,7 +61,7 @@ export default function MobileSidebar({ onRefresh }: MobileSidebarProps) {
                 <Link href="/admin/analytics">
                     <Button variant="ghost" className="w-full justify-start h-12 text-base font-normal">
                         <BarChart3 className="mr-3 h-5 w-5 text-purple-600" /> 
-                        Analytics / Dashboard
+                        Analytics
                     </Button>
                 </Link>
             </SheetClose>
@@ -92,22 +92,6 @@ export default function MobileSidebar({ onRefresh }: MobileSidebarProps) {
                         Manajemen Produk
                     </Button>
                 </Link>
-            </SheetClose>
-
-            <SheetClose asChild>
-                <Link href="/admin/grosir">
-                    <Button variant="ghost" className="w-full justify-start h-12 text-base font-normal">
-                        <FolderTree className="mr-3 h-5 w-5 text-slate-600" /> Pengaturan Harga Grosir
-                    </Button>
-                 </Link>
-            </SheetClose>
-            
-            <SheetClose asChild>
-                <Link href="/admin/analytics">
-                    <Button variant="ghost" className="w-full justify-start h-12 text-base font-normal">
-                        <ChartArea className="mr-3 h-5 w-5 text-slate-600" /> Analytics
-                    </Button>
-                    </Link>
             </SheetClose>
 
 

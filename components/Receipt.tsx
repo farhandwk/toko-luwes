@@ -45,7 +45,7 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
       {/* HEADER */}
       <div className="text-center mb-2 border-b-2 border-black pb-2 border-dashed flex flex-col justify-center items-center">
         <img 
-            src={logoUrl || "/toko-luwes.png"} 
+            src="/toko-luwes.png" 
             alt="Logo Toko" 
             style={{ 
                 maxWidth: '20mm', // Maksimal 40mm agar tidak mepet pinggir

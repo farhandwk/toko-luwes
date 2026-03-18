@@ -1,46 +1,77 @@
-// app/api/transactions/route.ts
 import { NextResponse } from 'next/server';
-import { google } from 'googleapis';
+import { supabase } from '@/lib/supabase';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      },
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
+    const { searchParams } = new URL(req.url);
+    
+    // 1. Ambil Parameter dari URL
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const search = searchParams.get('search') || '';
+    const paymentMethod = searchParams.get('paymentMethod') || 'Semua';
+    // Tambahan filter tanggal jika dibutuhkan nantinya
+    const startDate = searchParams.get('startDate'); 
+    const endDate = searchParams.get('endDate');
 
-    const sheets = google.sheets({ version: 'v4', auth });
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    // 2. Hitung Range Paginasi
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
 
-    // Baca Sheet "Transactions" dari baris A sampai F
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: 'Transactions!A2:F', // Mulai A2 biar Header gak ikut
-    });
+    // 3. Bangun Kueri Dasar
+    let query = supabase
+      .from('transactions')
+      .select('*', { count: 'exact' });
 
-    const rows = response.data.values;
-
-    if (!rows || rows.length === 0) {
-      return NextResponse.json([]);
+    // 4. Logika Pencarian (Berdasarkan ID Transaksi)
+    if (search) {
+      query = query.ilike('id', `%${search}%`);
     }
 
-    // Ubah Array Spreadsheet jadi Array of Objects JSON yang rapi
-    const transactions = rows.map((row) => ({
-      id: row[0],
-      date: row[1],
-      items: row[2], // Masih string JSON
-      total: row[3],
-      paymentMethod: row[4],
-      proofLink: row[5],
-    })).reverse(); // Balik urutan biar yang terbaru diatas (default)
+    // 5. Logika Filter Metode Pembayaran
+    if (paymentMethod !== 'Semua') {
+      query = query.eq('paymentMethod', paymentMethod);
+    }
 
-    return NextResponse.json(transactions);
+    // 6. Logika Filter Tanggal (Jika ada)
+    // Asumsi menggunakan kolom default 'inserted_at' dari Supabase
+    if (startDate && endDate) {
+      query = query.gte('inserted_at', startDate).lte('inserted_at', endDate);
+    }
+
+    // 7. Eksekusi Kueri dengan Order & Range
+    const { data, error, count } = await query
+      .order('inserted_at', { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      console.error("Supabase Error:", error);
+      throw error;
+    }
+
+    // 8. Mapping Data
+    const transactions = data.map((trx) => ({
+      id: trx.id,
+      date: trx.date,
+      items: trx.items,
+      total: trx.totalPrice,
+      paymentMethod: trx.paymentMethod,
+      proofLink: trx.proofLink,
+    }));
+
+    // 9. Kembalikan Response Lengkap dengan Metadata Paginasi
+    return NextResponse.json({
+      transactions,
+      total: count,
+      page,
+      limit
+    });
 
   } catch (error) {
     console.error("Error fetching transactions:", error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Gagal mengambil riwayat transaksi' }, 
+      { status: 500 }
+    );
   }
 }

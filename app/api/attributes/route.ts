@@ -1,101 +1,83 @@
-import { GoogleSpreadsheet } from 'google-spreadsheet';
-import { JWT } from 'google-auth-library';
+// app/api/attributes/route.ts
 import { NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { auth } from "@/auth";
 
-// --- CONFIG ---
-const serviceAccountAuth = new JWT({
-  // [PERBAIKAN] Gunakan nama variabel yang sesuai dengan .env.local Anda
-  email: process.env.GOOGLE_CLIENT_EMAIL, 
-  
-  key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-});
-
-const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID || '', serviceAccountAuth);
-
-// 1. GET: Ambil Data (Categories / Units)
-export async function GET(request: Request) {
+// 1. GET: Ambil Semua Atribut (Categories & Units) Sekaligus
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type'); // 'categories' atau 'units'
+    // Menjalankan kueri bersamaan (Parallel)
+    const [categoriesRes, unitsRes] = await Promise.all([
+      supabase.from('categories').select('id, name').order('name', { ascending: true }),
+      supabase.from('units').select('id, name').order('name', { ascending: true })
+    ]);
 
-    if (!type || (type !== 'categories' && type !== 'units')) {
-        return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
-    }
+    if (categoriesRes.error) throw categoriesRes.error;
+    if (unitsRes.error) throw unitsRes.error;
 
-    await doc.loadInfo();
-    const sheet = doc.sheetsByTitle[type];
-    
-    // Cek jika sheet belum dibuat
-    if (!sheet) {
-        console.error(`Sheet '${type}' tidak ditemukan.`);
-        return NextResponse.json([]); // Return array kosong biar gak error map
-    }
-
-    const rows = await sheet.getRows();
-    
-    // Mapping data
-    const data = rows.map((row: any) => ({
-      id: row.get('id'),
-      name: row.get('name'),
-    }));
-
-    return NextResponse.json(data);
+    return NextResponse.json({
+      categories: categoriesRes.data || [],
+      units: unitsRes.data || []
+    });
   } catch (error) {
-    console.error("API Error:", error);
-    return NextResponse.json({ error: 'Error fetching data' }, { status: 500 });
+    console.error("API GET Error:", error);
+    return NextResponse.json({ error: 'Gagal mengambil data atribut' }, { status: 500 });
   }
 }
 
-// 2. POST: Tambah Data Baru
+// 2. POST: Tambah Atribut Baru
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session) return NextResponse.json({ error: "Akses ditolak" }, { status: 401 });
+
     const body = await request.json();
-    const { type, name } = body;
+    const { type, name } = body; 
 
     if (!name || (type !== 'categories' && type !== 'units')) {
-        return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
+      return NextResponse.json({ error: 'Input tidak valid' }, { status: 400 });
     }
 
-    await doc.loadInfo();
-    const sheet = doc.sheetsByTitle[type];
-    
-    if (!sheet) return NextResponse.json({ error: 'Sheet not found' }, { status: 404 });
+    const { data, error } = await supabaseAdmin
+      .from(type)
+      .insert([{ name }]) // Supabase akan otomatis isi id (int8)
+      .select()
+      .single();
 
-    const newId = `${type === 'categories' ? 'CAT' : 'UNIT'}-${Date.now()}`;
-    await sheet.addRow({ id: newId, name });
+    if (error) throw error;
 
-    return NextResponse.json({ success: true, id: newId });
+    return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("Post Error:", error);
-    return NextResponse.json({ error: 'Gagal simpan' }, { status: 500 });
+    console.error("API POST Error:", error);
+    return NextResponse.json({ error: 'Gagal menyimpan data' }, { status: 500 });
   }
 }
 
-// 3. DELETE: Hapus Data
+// 3. DELETE: Hapus Atribut
 export async function DELETE(request: Request) {
   try {
+    const session = await auth();
+    if (!session) return NextResponse.json({ error: "Akses ditolak" }, { status: 401 });
+
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
     const id = searchParams.get('id');
 
-    if (!type || !id) return NextResponse.json({ error: 'Missing params' }, { status: 400 });
-
-    await doc.loadInfo();
-    const sheet = doc.sheetsByTitle[type]; // @ts-ignore
-    
-    if (!sheet) return NextResponse.json({ error: 'Sheet not found' }, { status: 404 });
-
-    const rows = await sheet.getRows();
-    const rowToDelete = rows.find((row: any) => row.get('id') === id);
-
-    if (rowToDelete) {
-        await rowToDelete.delete();
-        return NextResponse.json({ success: true });
-    } else {
-        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!type || !id || (type !== 'categories' && type !== 'units')) {
+      return NextResponse.json({ error: 'Parameter tidak lengkap' }, { status: 400 });
     }
+
+    const { error } = await supabaseAdmin
+      .from(type)
+      .delete()
+      .eq('id', id); // ID di sini akan dicocokkan dengan int8 di database
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: 'Gagal hapus' }, { status: 500 });
+    console.error("API DELETE Error:", error);
+    return NextResponse.json({ error: 'Gagal menghapus data' }, { status: 500 });
   }
 }

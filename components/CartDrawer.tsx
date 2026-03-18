@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"; 
-import { Trash2, ShoppingCart, Plus, Minus, Loader2, Send, Share2, Download, Printer } from 'lucide-react'; 
+import { Trash2, ShoppingCart, Plus, Minus, Loader2, Send, Share2, Download, Printer, Weight } from 'lucide-react'; 
 import { toast } from "sonner";
 import { toPng } from 'html-to-image';
 import { useReactToPrint } from 'react-to-print'; 
@@ -21,8 +21,10 @@ interface CartDrawerProps {
 }
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className }) => {
-  const { items, addItem, decreaseQty, removeItem, clearCart, totalPrice } = useCartStore();
-  const subTotal = totalPrice();
+  const { items, addItem, decreaseQty, removeItem, clearCart, totalPrice, updateQty } = useCartStore();
+  
+  // Memastikan subtotal dibulatkan (menghindari error angka desimal JS)
+  const subTotal = Math.round(totalPrice());
   
   // STATE INPUT
   const [discount, setDiscount] = useState<number | ''>('');
@@ -42,10 +44,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
   const [manualPhone, setManualPhone] = useState("");
   const [lastTxId, setLastTxId] = useState(""); 
   
-  // [FIX HYDRATION] State untuk memastikan komponen sudah dimount di client
   const [isMounted, setIsMounted] = useState(false);
 
-  // STATE SNAPSHOT (Untuk Struk)
+  // STATE SNAPSHOT (Riwayat setelah checkout)
   const [lastItems, setLastItems] = useState<any[]>([]);
   const [lastSubTotal, setLastSubTotal] = useState(0);
   const [lastDiscount, setLastDiscount] = useState(0);
@@ -53,6 +54,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
   const [lastCashReceived, setLastCashReceived] = useState(0);
   const [lastChange, setLastChange] = useState(0);
 
+  // Hitung kembalian
   const change = (paymentMethod === "Cash" && typeof cashReceived === 'number') ? cashReceived - finalTotal : 0;
 
   const isPaymentValid = () => {
@@ -65,12 +67,10 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
   };
 
   useEffect(() => {
-    // [FIX HYDRATION] Set mounted ke true setelah render pertama di client
     setIsMounted(true);
     setReceiptData({ id: `TRX-${Date.now()}`, date: getWIBDate() });
   }, [isOpen]);
 
-  // --- HANDLER INPUT ---
   const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       setDiscount(val === '' ? '' : Number(val));
@@ -115,10 +115,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     let phone = manualPhone.replace(/\D/g, '');
     if (phone.startsWith('0')) phone = '62' + phone.slice(1);
     
-    // Pesan Murni (Tanpa %20) untuk navigator.share (HP)
     const rawMessage = `Terima kasih sudah berbelanja di Toko Luwes.\nBerikut struk transaksinya 👇`;
-    
-    // Pesan Encoded (Dengan %20) untuk WA Web (PC)
     const encodedMessage = encodeURIComponent(rawMessage);
     const waUrl = phone ? `https://wa.me/${phone}?text=${encodedMessage}` : `https://wa.me/?text=${encodedMessage}`;
 
@@ -126,13 +123,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { 
-            await navigator.share({ 
-                files: [file], 
-                title: 'Struk Belanja', 
-                text: rawMessage
-            }); 
-        } 
+        try { await navigator.share({ files: [file], title: 'Struk Belanja', text: rawMessage }); } 
         catch (error) { console.log("Share dibatalkan"); }
     } else { 
         window.open(waUrl, '_blank'); 
@@ -147,36 +138,47 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
       if (receiptRef.current) {
         try {
           await new Promise(resolve => setTimeout(resolve, 100));
-          const dataUrl = await toPng(receiptRef.current, { 
-             cacheBust: true, backgroundColor: '#ffffff', filter: (node: any) => (node.tagName !== 'LINK'), skipFonts: true, 
-          } as any);
+          const dataUrl = await toPng(receiptRef.current, { cacheBust: true, backgroundColor: '#ffffff', filter: (node: any) => (node.tagName !== 'LINK'), skipFonts: true } as any);
           const res = await fetch(dataUrl);
           setReceiptBlob(await res.blob());
         } catch (imgError) { console.error("Gagal generate gambar:", imgError); }
       }
+      
+      // SINKRONISASI PAYLOAD DENGAN NAMA KOLOM SUPABASE (snake_case)
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: items, subTotal: subTotal, discount: Number(discount) || 0, total: finalTotal, paymentMethod: paymentMethod, date: receiptData.date
+          items: items, 
+          total: finalTotal, 
+          paymentMethod: paymentMethod, 
+          date: receiptData.date, 
+          cash_amount: Number(cashReceived) || 0, // Sesuai kolom DB
+          change_amount: Number(change) || 0    // Sesuai kolom DB
         }),
       });
+
       const result = await response.json();
       if (response.ok) {
         toast.success("Transaksi Sukses!");
         setLastTxId(result.transactionId || receiptData.id);
-        setLastItems(items); setLastSubTotal(subTotal); setLastDiscount(Number(discount) || 0); setLastPaymentMethod(paymentMethod); setLastCashReceived(Number(cashReceived) || 0); setLastChange(change);
-        setShowSuccessDialog(true); clearCart(); setCashReceived(''); setDiscount('');
+        setLastItems(items); 
+        setLastSubTotal(subTotal); 
+        setLastDiscount(Number(discount) || 0); 
+        setLastPaymentMethod(paymentMethod); 
+        setLastCashReceived(Number(cashReceived) || 0); 
+        setLastChange(change);
+        
+        setShowSuccessDialog(true); 
+        clearCart(); 
+        setCashReceived(''); 
+        setDiscount('');
         if (onCheckoutSuccess) onCheckoutSuccess();
       } else { throw new Error(result.error); }
     } catch (error) { console.error(error); toast.error("Gagal Checkout"); } finally { setIsLoading(false); }
   };
 
-  // Jika belum mounted (masih di server / loading awal), jangan tampilkan angka Rupiah dulu
-  // Ini untuk mencegah error Hydration Mismatch
-  if (!isMounted) {
-      return <div className={className}></div>; // Render kosong dulu
-  }
+  if (!isMounted) return <div className={className}></div>;
 
   return (
     <div className={className}>
@@ -186,13 +188,14 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <div className='fixed bottom-6 left-0 w-full flex justify-center z-40 px-4'>
                 <DialogTrigger asChild>
-                    <Button className="w-full h-14 text-lg rounded-full shadow-2xl bg-primary hover:bg-primary/90 transition-all flex items-center justify-between px-6">
+                    <Button className="w-full h-14 text-lg rounded-full shadow-2xl bg-primary hover:bg-primary/90 flex items-center justify-between px-6">
                         <div className="flex items-center gap-2">
                             <ShoppingCart className="h-6 w-6" />
-                            {/* Pastikan ini render setelah mounted */}
                             <span className="font-bold">{formatRupiah(finalTotal)}</span>
                         </div>
-                        <div className="bg-white text-primary text-xs font-bold px-2 py-1 rounded-full">{items.reduce((acc, item) => acc + item.qty, 0)} Item</div>
+                        <div className="bg-white text-primary text-xs font-bold px-2 py-1 rounded-full">
+                          {items.reduce((acc, item) => acc + (item.is_decimal ? 1 : item.qty), 0)} Item
+                        </div>
                     </Button>
                 </DialogTrigger>
             </div>
@@ -201,7 +204,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                     <DialogTitle className="font-bold flex items-center gap-2 text-base"><ShoppingCart className="h-5 w-5" /> Keranjang Belanja</DialogTitle>
                 </DialogHeader>
                 
-                {/* LIST ITEMS (MOBILE) */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
                     {items.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-8 text-gray-400">
@@ -213,12 +215,27 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                             <div key={item.id} className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100 text-sm">
                                 <div className="flex-1">
                                     <p className="font-semibold line-clamp-1">{item.name}</p>
-                                    <p className="text-xs text-gray-500">{formatRupiah(item.price)}</p>
+                                    <p className="text-xs text-gray-500">{formatRupiah(item.price)} / {item.units?.name || 'unit'}</p>
                                 </div>
                                 <div className="flex items-center gap-1 mx-2">
-                                    <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => decreaseQty(item.id)}><Minus className="h-3 w-3" /></Button>
-                                    <span className="font-bold w-6 text-center text-xs">{item.qty}</span>
-                                    <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => addItem(item)}><Plus className="h-3 w-3" /></Button>
+                                    {item.is_decimal ? (
+                                        <div className="flex items-center gap-1.5 bg-white border rounded-md px-2 py-1 shadow-sm h-9">
+                                            <Input 
+                                                type="number" 
+                                                step="0.01"
+                                                value={item.qty} 
+                                                onChange={(e) => updateQty(item.id, parseFloat(e.target.value) || 0)}
+                                                className="w-16 h-7 text-right font-mono font-bold text-xs p-0 border-none focus-visible:ring-0"
+                                            />
+                                            <span className="text-[10px] font-black text-slate-400 uppercase">{item.units?.name || 'kg'}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1">
+                                            <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => decreaseQty(item.id)}><Minus className="h-3 w-3" /></Button>
+                                            <span className="font-bold w-6 text-center text-xs">{item.qty}</span>
+                                            <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => addItem(item)}><Plus className="h-3 w-3" /></Button>
+                                        </div>
+                                    )}
                                 </div>
                                 <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-50" onClick={() => removeItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
                             </div>
@@ -226,18 +243,17 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                     )}
                 </div>
 
-                {/* FOOTER (MOBILE) */}
                 <div className="bg-slate-50 p-4 space-y-4 border-t flex-shrink-0">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2 col-span-2">
-                            <Label className="text-xs">Diskon (Rp)</Label>
+                            <Label className="text-xs font-bold text-slate-500 uppercase">Diskon (Rp)</Label>
                             <Input type="number" placeholder="0" value={discount} onChange={handleDiscountChange} className="font-mono h-9 text-sm"/>
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <Label className="text-xs">Metode Pembayaran</Label>
+                        <Label className="text-xs font-bold text-slate-500 uppercase">Metode Pembayaran</Label>
                         <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                            <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Pilih metode" /></SelectTrigger>
+                            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="Cash">Tunai (Cash)</SelectItem>
                                 <SelectItem value="QRIS">QRIS</SelectItem>
@@ -247,8 +263,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                     </div>
                     {paymentMethod === "Cash" && (
                         <div className="space-y-2">
-                            <Label className="text-xs">Uang Diterima</Label>
-                            <Input type="number" placeholder="0" value={cashReceived} onChange={handleCashChange} className="text-right text-lg font-mono font-bold h-10" autoFocus={false} />
+                            <Label className="text-xs font-bold text-slate-500 uppercase">Uang Diterima</Label>
+                            <Input type="number" placeholder="0" value={cashReceived} onChange={handleCashChange} className="text-right text-lg font-mono font-bold h-10 border-blue-200 focus:border-blue-500" />
                         </div>
                     )}
                     <div className="space-y-1 pt-2 border-t">
@@ -258,7 +274,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                         <div className="flex justify-between items-center text-lg font-bold pt-2"><span>Total</span><span className="text-primary">{formatRupiah(finalTotal)}</span></div>
                     </div>
                     <Button className="w-full h-10 text-base font-bold shadow-sm" disabled={!isPaymentValid() || isLoading} onClick={handleCheckout}>
-                        {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Proses...</>) : (`Bayar ${formatRupiah(finalTotal)}`)}
+                        {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : `Bayar ${formatRupiah(finalTotal)}`}
                     </Button>
                 </div>
             </DialogContent>
@@ -267,14 +283,11 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
 
       {/* --- TAMPILAN DESKTOP --- */}
       <div className="hidden lg:flex flex-col absolute top-4 right-4 w-96 bg-white rounded-xl border shadow-2xl z-50 max-h-[78vh]">
-          
-          {/* Header (Fixed) */}
           <div className="p-3 border-b bg-slate-50 flex justify-between items-center flex-shrink-0">
             <h2 className="font-bold flex items-center gap-2 text-sm"><ShoppingCart className="h-4 w-4" /> Keranjang Belanja</h2>
              {items.length > 0 && (<Button variant="ghost" size="sm" className="h-8 text-xs text-red-500 hover:bg-red-50" onClick={() => {if(confirm('Kosongkan keranjang?')) clearCart()}}>Kosongkan</Button>)}
           </div>
           
-          {/* List Item (Flexible & Scrollable) */}
           <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-3">
                 {items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-gray-400">
@@ -284,33 +297,47 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                 ) : (
                 items.map((item) => (
                     <div key={item.id} className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100 text-sm">
-                    <div className="flex-1">
-                        <p className="font-semibold line-clamp-1">{item.name}</p>
-                        <p className="text-xs text-gray-500">{formatRupiah(item.price)}</p>
-                    </div>
-                    <div className="flex items-center gap-1 mx-2">
-                        <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => decreaseQty(item.id)}><Minus className="h-3 w-3" /></Button>
-                        <span className="font-bold w-6 text-center text-xs">{item.qty}</span>
-                        <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => addItem(item)}><Plus className="h-3 w-3" /></Button>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-50" onClick={() => removeItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
+                        <div className="flex-1">
+                            <p className="font-semibold line-clamp-1">{item.name}</p>
+                            <p className="text-xs text-gray-500">{formatRupiah(item.price)} / {item.units?.name || 'unit'}</p>
+                        </div>
+                        <div className="flex items-center gap-1 mx-2">
+                            {item.is_decimal ? (
+                                <div className="flex items-center gap-1.5 bg-white border rounded-md px-2 py-1 shadow-sm h-8">
+                                    <Input 
+                                        type="number" 
+                                        step="0.01"
+                                        value={item.qty} 
+                                        onChange={(e) => updateQty(item.id, parseFloat(e.target.value) || 0)}
+                                        className="w-16 h-6 text-right font-mono font-bold text-xs p-0 border-none focus-visible:ring-0"
+                                    />
+                                    <span className="text-[10px] font-black text-slate-400 uppercase">{item.units?.name || 'kg'}</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-1">
+                                    <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => decreaseQty(item.id)}><Minus className="h-3 w-3" /></Button>
+                                    <span className="font-bold w-6 text-center text-xs">{item.qty}</span>
+                                    <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => addItem(item)}><Plus className="h-3 w-3" /></Button>
+                                </div>
+                            )}
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-50" onClick={() => removeItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                 ))
                 )}
             </div>
           
-          {/* Footer (Fixed) */}
           <div className="bg-slate-50 p-4 space-y-4 border-t flex-shrink-0">
             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2 col-span-2">
-                    <Label className="text-xs">Diskon (Rp)</Label>
+                <div className="space-y-1.5 col-span-2">
+                    <Label className="text-xs font-bold text-slate-500 uppercase">Diskon (Rp)</Label>
                     <Input type="number" placeholder="0" value={discount} onChange={handleDiscountChange} className="font-mono h-9 text-sm"/>
                 </div>
             </div>
-            <div className="space-y-2">
-                <Label className="text-xs">Metode Pembayaran</Label>
+            <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-500 uppercase">Metode Pembayaran</Label>
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                    <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Pilih metode" /></SelectTrigger>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="Cash">Tunai (Cash)</SelectItem>
                         <SelectItem value="QRIS">QRIS</SelectItem>
@@ -319,9 +346,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                 </Select>
             </div>
             {paymentMethod === "Cash" && (
-                <div className="space-y-2">
-                    <Label className="text-xs">Uang Diterima</Label>
-                    <Input type="number" placeholder="0" value={cashReceived} onChange={handleCashChange} className="text-right text-lg font-mono font-bold h-10" autoFocus={false} />
+                <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-500 uppercase">Uang Diterima</Label>
+                    <Input type="number" placeholder="0" value={cashReceived} onChange={handleCashChange} className="text-right text-lg font-mono font-bold h-10 border-blue-200 focus:border-blue-500" />
                 </div>
             )}
             <div className="space-y-1 pt-2 border-t">
@@ -331,25 +358,23 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                 <div className="flex justify-between items-center text-lg font-bold pt-2"><span>Total</span><span className="text-primary">{formatRupiah(finalTotal)}</span></div>
             </div>
             <Button className="w-full h-10 text-base font-bold shadow-sm" disabled={!isPaymentValid() || isLoading} onClick={handleCheckout}>
-                {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Proses...</>) : (`Bayar ${formatRupiah(finalTotal)}`)}
+                {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : `Bayar ${formatRupiah(finalTotal)}`}
             </Button>
           </div>
-
       </div>
 
-      {/* DIALOG SUKSES */}
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-           <DialogContent className="sm:max-w-md w-[90%] rounded-xl">
-            <DialogHeader><DialogTitle className="text-center flex flex-col items-center gap-2">Transaksi Berhasil!</DialogTitle></DialogHeader>
+          <DialogContent className="sm:max-w-md w-[90%] rounded-xl">
+            <DialogHeader><DialogTitle className="text-center">Transaksi Berhasil!</DialogTitle></DialogHeader>
             <div className="space-y-3 py-2">
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Nomor WhatsApp Pelanggan</Label>
-                    <div className="flex gap-2"><Input placeholder="08xxxxxxxxxx" value={manualPhone} onChange={(e) => setManualPhone(e.target.value)} className="bg-white" /><Button variant="outline" onClick={handleDownloadImage} title="Download"><Download className="h-4 w-4" /></Button></div>
+                    <Label className="text-xs text-slate-500 mb-1.5 block font-bold uppercase">Nomor WhatsApp Pelanggan</Label>
+                    <div className="flex gap-2"><Input placeholder="08xxxxxxxxxx" value={manualPhone} onChange={(e) => setManualPhone(e.target.value)} /><Button variant="outline" onClick={handleDownloadImage} title="Download"><Download className="h-4 w-4" /></Button></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 pt-2">
-                    <Button variant="outline" className="flex flex-col h-16 hidden md:flex" onClick={() => handlePrintPC()}><Printer className="h-5 w-5" /><span className="text-xs">Cetak (USB)</span></Button>
-                    <Button variant="outline" className="flex flex-col h-16 md:hidden" onClick={handlePrintMobile}><Printer className="h-5 w-5" /><span className="text-xs">Cetak (BT)</span></Button>
-                    <Button className="flex flex-col h-16 bg-green-600 col-span-2 md:col-span-1" onClick={handleOpenWhatsApp}><Share2 className="h-5 w-5" /><span className="text-xs">Kirim WA</span></Button>
+                    <Button variant="outline" className="h-16 flex flex-col hidden md:flex" onClick={() => handlePrintPC()}><Printer className="h-5 w-5" /><span className="text-xs">Cetak (USB)</span></Button>
+                    <Button variant="outline" className="h-16 flex flex-col md:hidden" onClick={handlePrintMobile}><Printer className="h-5 w-5" /><span className="text-xs">Cetak (BT)</span></Button>
+                    <Button className="h-16 flex flex-col bg-green-600 col-span-2 md:col-span-1" onClick={handleOpenWhatsApp}><Share2 className="h-5 w-5" /><span className="text-xs text-white">Kirim WA</span></Button>
                 </div>
             </div>
             <DialogFooter className="sm:justify-center"><Button variant="ghost" onClick={() => { setShowSuccessDialog(false); setIsOpen(false); }}>Tutup</Button></DialogFooter>
@@ -357,7 +382,18 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
       </Dialog>
 
       <div style={{ position: 'fixed', top: 0, left: '-9999px', zIndex: -50 }}>
-        <Receipt ref={receiptRef} items={items.length > 0 ? items : lastItems} subtotal={items.length > 0 ? subTotal : lastSubTotal} total={items.length > 0 ? finalTotal : (lastSubTotal - lastDiscount)} discount={items.length > 0 ? (Number(discount) || 0) : lastDiscount} paymentMethod={items.length > 0 ? paymentMethod : lastPaymentMethod} cashAmount={items.length > 0 ? (Number(cashReceived) || 0) : lastCashReceived} changeAmount={items.length > 0 ? change : lastChange} date={receiptData.date} id={receiptData.id} />
+        <Receipt 
+            ref={receiptRef} 
+            items={items.length > 0 ? items : lastItems} 
+            subtotal={items.length > 0 ? subTotal : lastSubTotal} 
+            total={items.length > 0 ? finalTotal : (lastSubTotal - lastDiscount)} 
+            discount={items.length > 0 ? (Number(discount) || 0) : lastDiscount} 
+            paymentMethod={items.length > 0 ? paymentMethod : lastPaymentMethod} 
+            cashAmount={items.length > 0 ? (Number(cashReceived) || 0) : lastCashReceived} 
+            changeAmount={items.length > 0 ? change : lastChange} 
+            date={receiptData.date} 
+            id={lastTxId || receiptData.id} 
+        />
       </div>
     </div>
   );
