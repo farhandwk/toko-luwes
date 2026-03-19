@@ -1,32 +1,45 @@
 // lib/action.ts
 'use server';
 
-import { signIn } from '@/auth'; // Pastikan import dari auth.ts anda
-import { AuthError } from 'next-auth';
+// GANTI BARIS INI: ambil dari file server kita sendiri, bukan dari library langsung
+import { createClient } from '@/lib/supabase-server'; 
+import { redirect } from 'next/navigation';
 
 export async function authenticate(
   prevState: string | undefined,
   formData: FormData,
 ) {
+  // Sekarang createClient() ini tidak akan error karena tidak butuh argumen lagi
+  const supabase = await createClient();
+
+  const username = formData.get('username') as string;
+  const password = formData.get('password') as string;
+  const redirectTo = (formData.get('redirectTo') as string) || '/';
+
+  const email = username.includes('@') ? username : `${username}@toko.com`;
+
   try {
-    // Jalankan sign in NextAuth
-    await signIn('credentials', formData);
-  } catch (error) {
-    // PENTING: NextAuth menggunakan throw error untuk redirect.
-    // Kita harus melempar ulang error tersebut agar redirect terjadi.
-    if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
-        throw error;
-    }
-    
-    // Handle error login biasa (password salah, user tak ditemukan)
-    if (error instanceof AuthError) {
-      switch (error.type) {
-        case 'CredentialsSignin':
-          return 'Invalid credentials.';
-        default:
-          return 'Something went wrong.';
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      if (error.message.includes('Invalid login credentials')) {
+        return 'Username atau Password salah.';
       }
+      return error.message;
     }
-    throw error;
+  } catch (err) {
+    return 'Terjadi kesalahan sistem.';
   }
+
+  // Redirect harus di luar try-catch
+  redirect(redirectTo);
+}
+
+export async function logout() {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect('/login');
 }

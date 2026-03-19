@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
-import { auth } from "@/auth";
+import { createClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function POST(req: Request) {
   try {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Akses ditolak!" }, { status: 401 });
+    const supabaseServer = await createClient();
+    const { data: { user } } = await supabaseServer.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "User belum login" }, { status: 401 });
+    }
 
     const body = await req.json();
-    const { items, total, paymentMethod, date, cash_amount, change_amount } = body;
+    const { items, total_price, payment_method, date, cash_amount, change_amount } = body;
 
     if (!items || items.length === 0) return NextResponse.json({ error: "Keranjang Kosong!" }, { status: 400 });
 
@@ -45,8 +49,8 @@ export async function POST(req: Request) {
       id: transactionId,
       date: date || new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
       items: slimItems, 
-      totalPrice: total,
-      paymentMethod: paymentMethod || 'Cash',
+      total_price: Number(total_price) || 0,       // Gunakan variabel total_price
+      payment_method: payment_method || 'Cash',    // Gunakan variabel payment_method
       cash_amount: Number(cash_amount) || 0,
       change_amount: Number(change_amount) || 0,
       inserted_at: new Date().toISOString()

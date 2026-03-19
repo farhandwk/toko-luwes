@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { auth } from "@/auth";
+import { createClient } from '@/lib/supabase-server';
 
 // 1. GET: Ambil Semua Atribut (Categories & Units) Sekaligus
 export async function GET() {
@@ -29,8 +29,12 @@ export async function GET() {
 // 2. POST: Tambah Atribut Baru
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Akses ditolak" }, { status: 401 });
+    const supabaseServer = await createClient();
+    const { data: { user } } = await supabaseServer.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "User belum login" }, { status: 401 });
+    }
 
     const body = await request.json();
     const { type, name } = body; 
@@ -57,8 +61,12 @@ export async function POST(request: Request) {
 // 3. DELETE: Hapus Atribut
 export async function DELETE(request: Request) {
   try {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Akses ditolak" }, { status: 401 });
+    const supabaseServer = await createClient();
+    const { data: { user } } = await supabaseServer.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "User belum login" }, { status: 401 });
+    }
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');

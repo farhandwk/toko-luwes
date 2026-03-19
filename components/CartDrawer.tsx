@@ -150,8 +150,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: items, 
-          total: finalTotal, 
-          paymentMethod: paymentMethod, 
+          total_price: finalTotal, 
+          payment_method: paymentMethod, 
           date: receiptData.date, 
           cash_amount: Number(cashReceived) || 0, // Sesuai kolom DB
           change_amount: Number(change) || 0    // Sesuai kolom DB

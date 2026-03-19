@@ -2,13 +2,17 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { auth } from "@/auth";
+import { createClient } from '@/lib/supabase-server';
 
 // 1. GET: Tetap sama (Sudah Benar)
 export async function GET(req: Request) {
   try {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "User belum login" }, { status: 401 });
+    const supabaseServer = await createClient();
+    const { data: { user } } = await supabaseServer.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "User belum login" }, { status: 401 });
+    }
 
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -41,8 +45,12 @@ export async function GET(req: Request) {
 // 2. POST: Tambah Produk (DIPERBAIKI)
 export async function POST(req: Request) {
   try {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "User belum login" }, { status: 401 });
+   const supabaseServer = await createClient();
+    const { data: { user } } = await supabaseServer.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "User belum login" }, { status: 401 });
+    }
 
     const body = await req.json();
     // Destructure sesuai dengan yang dikirim dari AdminProducts.tsx
@@ -73,8 +81,12 @@ export async function POST(req: Request) {
 // 3. PUT: Edit Produk (DIPERBAIKI)
 export async function PUT(req: Request) {
   try {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "User belum login" }, { status: 401 });
+    const supabaseServer = await createClient();
+    const { data: { user } } = await supabaseServer.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "User belum login" }, { status: 401 });
+    }
 
     const body = await req.json();
     // Ambil is_decimal dari body agar tidak undefined
@@ -104,8 +116,12 @@ export async function PUT(req: Request) {
 // 4. DELETE: Hapus Produk (SINKRONISASI)
 export async function DELETE(req: Request) {
   try {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "User belum login" }, { status: 401 });
+    const supabaseServer = await createClient();
+    const { data: { user } } = await supabaseServer.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "User belum login" }, { status: 401 });
+    }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
