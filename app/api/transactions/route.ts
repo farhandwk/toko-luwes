@@ -5,73 +5,68 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     
-    // 1. Ambil Parameter dari URL
+    // 1. Ambil Parameter
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
     const search = searchParams.get('search') || '';
-    const paymentMethod = searchParams.get('paymentMethod') || 'Semua';
-    // Tambahan filter tanggal jika dibutuhkan nantinya
-    const startDate = searchParams.get('startDate'); 
-    const endDate = searchParams.get('endDate');
+    const payment_method = searchParams.get('payment_method') || 'Semua';
+    const start_date = searchParams.get('start_date'); 
+    const end_date = searchParams.get('end_date');
 
-    // 2. Hitung Range Paginasi
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    // 3. Bangun Kueri Dasar
+    // 2. Bangun Kueri (Pilih kolom snake_case)
     let query = supabase
       .from('transactions')
-      .select('*', { count: 'exact' });
+      .select('id, date, items, total_price, payment_method, cash_amount, change_amount, inserted_at', { count: 'exact' });
 
-    // 4. Logika Pencarian (Berdasarkan ID Transaksi)
+    // 3. Filter Search
     if (search) {
       query = query.ilike('id', `%${search}%`);
     }
 
-    // 5. Logika Filter Metode Pembayaran
-    if (paymentMethod !== 'Semua') {
-      query = query.eq('paymentMethod', paymentMethod);
+    // 4. Filter Metode Bayar
+    if (payment_method !== 'Semua') {
+      query = query.eq('payment_method', payment_method);
     }
 
-    // 6. Logika Filter Tanggal (Jika ada)
-    // Asumsi menggunakan kolom default 'inserted_at' dari Supabase
-    if (startDate && endDate) {
-      query = query.gte('inserted_at', startDate).lte('inserted_at', endDate);
+    // 5. Filter Tanggal
+    if (start_date) {
+      query = query.gte('inserted_at', start_date);
+    }
+    if (end_date) {
+      // Tambahkan waktu akhir hari agar pencarian hingga detik terakhir
+      query = query.lte('inserted_at', `${end_date}T23:59:59`);
     }
 
-    // 7. Eksekusi Kueri dengan Order & Range
+    // 6. Eksekusi
     const { data, error, count } = await query
       .order('inserted_at', { ascending: false })
       .range(from, to);
 
-    if (error) {
-      console.error("Supabase Error:", error);
-      throw error;
-    }
+    if (error) throw error;
 
-    // 8. Mapping Data
+    // 7. Mapping Data untuk Frontend
     const transactions = data.map((trx) => ({
       id: trx.id,
       date: trx.date,
       items: trx.items,
-      total: trx.totalPrice,
-      paymentMethod: trx.paymentMethod,
-      proofLink: trx.proofLink,
+      total_price: trx.total_price,
+      payment_method: trx.payment_method,
+      cash_amount: trx.cash_amount,     // Penting untuk struk
+      change_amount: trx.change_amount, // Penting untuk struk
     }));
 
-    // 9. Kembalikan Response Lengkap dengan Metadata Paginasi
     return NextResponse.json({
       transactions,
-      total: count,
+      total: count, // Ini yang dibaca frontend untuk tulisan "Total X transaksi"
       page,
       limit
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching transactions:", error);
-    return NextResponse.json(
-      { error: 'Gagal mengambil riwayat transaksi' }, 
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

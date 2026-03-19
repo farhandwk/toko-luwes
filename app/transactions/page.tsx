@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, FileText, Printer, Loader2, ArrowLeft, Eye, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Printer, Loader2, ArrowLeft, Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import Receipt from "@/components/Receipt"; 
 import { useReactToPrint } from 'react-to-print';
 import { toast } from "sonner";
@@ -22,9 +22,9 @@ export default function TransactionsPage() {
   // --- STATE PAGINASI & FILTER ---
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search, 500);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("Semua");
+  const [start_date, setstart_date] = useState("");
+  const [end_date, setend_date] = useState("");
+  const [payment_method, setpayment_method] = useState("Semua");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalTransactions, setTotalTransactions] = useState(0);
   const limit = 10;
@@ -41,17 +41,17 @@ export default function TransactionsPage() {
         page: currentPage.toString(),
         limit: limit.toString(),
         search: debouncedSearch,
-        paymentMethod: paymentMethod,
-        startDate: startDate,
-        endDate: endDate
+        payment_method: payment_method,
+        start_date: start_date,
+        end_date: end_date
       });
 
       const res = await fetch(`/api/transactions?${params.toString()}`);
       const data = await res.json();
 
       if (res.ok) {
-        // [FIX ERROR] Ambil array dari dalam properti 'transactions'
         setTransactions(data.transactions || []);
+        // PENTING: Ambil jumlah baris dari 'total', bukan 'total_price'
         setTotalTransactions(data.total || 0);
       }
     } catch (error) {
@@ -60,7 +60,7 @@ export default function TransactionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, debouncedSearch, paymentMethod, startDate, endDate]);
+  }, [currentPage, debouncedSearch, payment_method, start_date, end_date]);
 
   useEffect(() => {
     fetchTransactions();
@@ -70,38 +70,51 @@ export default function TransactionsPage() {
   const handleSearchChange = (val: string) => {
     setSearch(val);
     setCurrentPage(1);
-    if (val.trim() !== "") {
-    setPaymentMethod("Semua");
-  }
+    if (val.trim() !== "") setpayment_method("Semua");
   };
 
   const resetFilters = () => {
     setSearch("");
-    setStartDate("");
-    setEndDate("");
-    setPaymentMethod("Semua");
+    setstart_date("");
+    setend_date("");
+    setpayment_method("Semua");
     setCurrentPage(1);
   };
 
-  // --- LOGIKA RECEIPT (Sama seperti sebelumnya) ---
   const cleanNumber = (v: any) => v ? Number(String(v).replace(/[^0-9.-]+/g, "")) : 0;
 
   const openReceiptModal = (trx: any) => {
-    const items = typeof trx.items === 'string' ? JSON.parse(trx.items) : trx.items;
-    const dbTotal = cleanNumber(trx.total);
-    const calcSub = items.reduce((acc: number, item: any) => acc + (Number(item.price) * Number(item.qty)), 0);
+  // 1. Pastikan items di-parse jika masih dalam bentuk string
+  const items = typeof trx.items === 'string' ? JSON.parse(trx.items) : trx.items;
+  
+  // 2. Ambil total_price dari database (hasil migrasi snake_case)
+  const dbTotal = cleanNumber(trx.total_price);
+  
+  // 3. Hitung subtotal dari array items
+  const calcSub = items.reduce((acc: number, item: any) => {
+    // Gunakan cleanNumber untuk memastikan harga & qty adalah angka
+    const price = cleanNumber(item.price);
+    const qty = cleanNumber(item.qty);
+    return acc + (price * qty);
+  }, 0);
+  
+  // 4. Set data ke modal dengan nama field yang sesuai props Receipt.tsx
+  setSelectedTrx({
+    ...trx,
+    items,
+    // GUNAKAN HURUF KECIL 'subtotal' agar sinkron dengan Receipt.tsx
+    subtotal: calcSub > dbTotal ? calcSub : dbTotal, 
+    discount: calcSub > dbTotal ? calcSub - dbTotal : 0,
+    total: dbTotal,
     
-    setSelectedTrx({
-      ...trx,
-      items,
-      subTotal: calcSub > dbTotal ? calcSub : dbTotal,
-      discount: calcSub > dbTotal ? calcSub - dbTotal : 0,
-      total: dbTotal,
-      cashAmount: cleanNumber(trx.cashAmount) || dbTotal,
-      changeAmount: cleanNumber(trx.changeAmount) || 0
-    });
-    setIsModalOpen(true);
-  };
+    // Sinkronisasi data ke CamelCase yang diharapkan komponen Receipt
+    paymentMethod: trx.payment_method, 
+    cashAmount: cleanNumber(trx.cash_amount) || dbTotal, 
+    changeAmount: cleanNumber(trx.change_amount) || 0
+  });
+  
+  setIsModalOpen(true);
+};
 
   const handlePrint = useReactToPrint({
     contentRef: receiptRef,
@@ -132,7 +145,7 @@ export default function TransactionsPage() {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-slate-500">Metode</Label>
-            <Select value={paymentMethod} onValueChange={(v) => {setPaymentMethod(v); setCurrentPage(1)}}>
+            <Select value={payment_method} onValueChange={(v) => {setpayment_method(v); setCurrentPage(1)}}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Semua">Semua Metode</SelectItem>
@@ -144,14 +157,14 @@ export default function TransactionsPage() {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-slate-500">Dari Tanggal</Label>
-            <Input type="date" value={startDate} onChange={(e) => {setStartDate(e.target.value); setCurrentPage(1)}} />
+            <Input type="date" value={start_date} onChange={(e) => {setstart_date(e.target.value); setCurrentPage(1)}} />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-slate-500">Sampai Tanggal</Label>
-            <Input type="date" value={endDate} onChange={(e) => {setEndDate(e.target.value); setCurrentPage(1)}} />
+            <Input type="date" value={end_date} onChange={(e) => {setend_date(e.target.value); setCurrentPage(1)}} />
           </div>
         </div>
-        {(search || startDate || endDate || paymentMethod !== "Semua") && (
+        {(search || start_date || end_date || payment_method !== "Semua") && (
           <Button variant="ghost" size="sm" onClick={resetFilters} className="text-red-500 h-8 text-xs">Reset Filter</Button>
         )}
       </div>
@@ -179,11 +192,11 @@ export default function TransactionsPage() {
                   <TableCell className="font-mono text-xs">{t.id}</TableCell>
                   <TableCell className="text-xs">{t.date}</TableCell>
                   <TableCell>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${t.paymentMethod === 'Cash' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
-                      {t.paymentMethod}
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${t.payment_method === 'Cash' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+                      {t.payment_method}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right font-bold">{formatRupiah(cleanNumber(t.total))}</TableCell>
+                  <TableCell className="text-right font-bold">{formatRupiah(cleanNumber(t.total_price))}</TableCell>
                   <TableCell className="text-center">
                     <Button variant="ghost" size="sm" onClick={() => openReceiptModal(t)}><Eye className="h-4 w-4 text-blue-600" /></Button>
                   </TableCell>
@@ -193,7 +206,7 @@ export default function TransactionsPage() {
           </TableBody>
         </Table>
 
-        {/* PAGINASI ANGKA */}
+        {/* PAGINASI */}
         {!isLoading && totalTransactions > limit && (
           <div className="flex items-center justify-between px-4 py-4 bg-slate-50 border-t">
             <div className="text-xs text-slate-500">Halaman {currentPage} dari {totalPages}</div>
@@ -212,6 +225,9 @@ export default function TransactionsPage() {
 
       {/* DIALOG RECEIPT */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogHeader>
+      <DialogTitle className="sr-only">Struk Transaksi</DialogTitle>
+    </DialogHeader>
         <DialogContent className="sm:max-w-[400px]">
           <div className="flex justify-center bg-slate-100 py-4 rounded-md border overflow-auto max-h-[70vh]">
             {selectedTrx && (

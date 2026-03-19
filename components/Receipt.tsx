@@ -15,7 +15,7 @@ interface ReceiptProps {
 }
 
 const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
-  const { items, subtotal, total, discount, paymentMethod, cashAmount, changeAmount, date, id, logoUrl } = props;
+  const { items, subtotal, total, discount, paymentMethod, cashAmount, changeAmount, date, id } = props;
 
   return (
     <div 
@@ -23,125 +23,96 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
       className="bg-white text-black font-mono mx-auto leading-tight" 
       style={{ 
         width: '58mm', 
-        padding: '5px 2px', // Padding secukupnya
-        fontFamily: "'sans-serif", 
-        fontSize: '12px', // [REQUEST BOSS] Font tetap 12px
-        fontWeight: '600', // Agak tebal biar jelas di thermal printer
-        lineHeight: '1.3', // Jarak antar baris sedikit direnggangkan biar tidak numpuk
+        padding: '5px 5px', // Padding sedikit diperlebar agar tidak terpotong printer
+        fontFamily: "monospace", // Gunakan monospace murni untuk kesan struk
+        fontSize: '12px',
+        fontWeight: '600',
+        lineHeight: '1.2',
         position: 'relative',
-        border: '1px solid black',
+        backgroundColor: 'white'
       }}
     >
-      <div style={{ 
-         height: '5mm',  
-          display: 'flex', 
-          alignItems: 'end', 
-           justifyContent: 'center', 
-           color: 'black' 
-        }}>
-           <span className="text-[1px] leading-none opacity-50">.</span> 
-    </div>
-
       {/* HEADER */}
-      <div className="text-center mb-2 border-b-2 border-black pb-2 border-dashed flex flex-col justify-center items-center">
+      <div className="text-center mb-2 border-b-2 border-black pb-2 border-dashed flex flex-col items-center">
         <img 
             src="/toko-luwes.png" 
-            alt="Logo Toko" 
+            alt="Logo" 
             style={{ 
-                maxWidth: '20mm', // Maksimal 40mm agar tidak mepet pinggir
-                height: 'auto',   // Tinggi menyesuaikan
-                marginBottom: '10px',
-                // [TIPS] Filter ini memaksa gambar jadi hitam putih tajam
-                filter: 'grayscale(100%) contrast(150%)', 
-                display: 'block'
+                maxWidth: '25mm',
+                height: 'auto',
+                marginBottom: '5px',
+                filter: 'grayscale(100%) contrast(200%)', // Lebih kontras untuk printer thermal
             }}
-            // Handler jika gambar tidak ditemukan, sembunyikan elemennya
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
         />
-        {/* <h1 className="text-xl font-extrabold mb-1">TOKO LUWES</h1> */}
-        <p className="text-[10px] font-bold">Jl. Pacarmulyo, Gondang, Watumalang, Wonosobo</p>
-        <p className="text-[10px] font-normal">Telp: 0852-2679-0465</p>
+        <p className="text-[10px] font-bold">Jl. Pacarmulyo, Gondang, Watumalang</p>
+        <p className="text-[10px]">Wonosobo | 0852-2679-0465</p>
       </div>
 
       {/* INFO TRANSAKSI */}
-      <div className="flex justify-between text-[10px] mb-2 font-normal">
+      <div className="flex justify-between text-[9px] mb-2 border-b border-black border-dashed pb-1">
         <span>{date}</span>
         <span>{id}</span>
       </div>
 
       {/* LIST ITEM */}
-      <div className="space-y-3 mb-2 border-b-2 border-black pb-2 border-dashed">
-        {items.map((item, index) => (
+      <div className="space-y-2 mb-2 border-b-2 border-black pb-2 border-dashed">
+        {items?.map((item, index) => (
           <div key={index} className="flex flex-col">
+            <span className="font-bold text-[11px] uppercase">{item.name}</span>
             
-            {/* 1. NAMA PRODUK (Full Width) */}
-            <span className="font-bold text-left break-words">
-                {item.name}
-            </span>
-
-            {/* 2. LABEL KHUSUS (Di baris baru agar aman) */}
-            {item.isSpecial && (
-                 <span className="text-[10px] italic font-bold text-slate-800 -mt-0.5 mb-0.5">
-                   ** Harga Khusus **
-                 </span>
+            {/* Cek is_special (snake_case) atau isSpecial (camelCase) */}
+            {(item.is_special || item.isSpecial) && (
+                 <span className="text-[9px] italic font-bold">- Harga Khusus -</span>
             )}
 
-            {/* 3. QTY & HARGA (Di baris bawahnya) */}
-            <div className="flex justify-between font-normal">
+            <div className="flex justify-between text-[11px]">
               <span>{item.qty} x {formatRupiah(item.price)}</span>
               <span>{formatRupiah(item.price * item.qty)}</span>
             </div>
-
           </div>
         ))}
       </div>
 
       {/* TOTAL & PEMBAYARAN */}
-      <div className="space-y-1 mb-4 border-b-2 border-black pb-2 border-dashed">
-        <div className="flex justify-between font-bold">
+      <div className="space-y-1 mb-2">
+        <div className="flex justify-between text-[11px]">
           <span>Subtotal</span>
           <span>{formatRupiah(subtotal)}</span>
         </div>
         {discount > 0 && (
-          <div className="flex justify-between text-[10px]">
+          <div className="flex justify-between text-[11px]">
             <span>Diskon</span>
             <span>-{formatRupiah(discount)}</span>
           </div>
         )}
-        <div className="flex justify-between font-extrabold text-[14px] mt-1">
+        <div className="flex justify-between font-extrabold text-[13px] border-t border-black pt-1">
           <span>TOTAL</span>
           <span>{formatRupiah(total)}</span>
         </div>
       </div>
 
-      <div className="space-y-1 mb-6 text-[11px] font-normal">
+      <div className="space-y-1 mb-4 text-[10px] pt-1">
         <div className="flex justify-between">
           <span>Bayar ({paymentMethod})</span>
-          <span>{paymentMethod === 'Cash' ? formatRupiah(cashAmount) : '-'}</span>
+          <span>{paymentMethod === 'Cash' ? formatRupiah(cashAmount) : formatRupiah(total)}</span>
         </div>
         {paymentMethod === 'Cash' && (
-          <div className="flex justify-between">
+          <div className="flex justify-between font-bold">
             <span>Kembali</span>
             <span>{formatRupiah(changeAmount)}</span>
           </div>
         )}
       </div>
 
-      <div className="text-center text-[10px] font-normal">
-        <p>Terima Kasih</p>
-        <p>Barang beli tidak dapat ditukar</p>
+      <div className="text-center text-[9px] border-t border-black border-dashed pt-2">
+        <p className="font-bold italic">TERIMA KASIH</p>
+        <p>Barang yang sudah dibeli</p>
+        <p>tidak dapat ditukar/dikembalikan</p>
       </div>
-
-      {/* Spacer Bawah */}
-     <div style={{ 
-         height: '5mm',  
-          display: 'flex', 
-          alignItems: 'end', 
-           justifyContent: 'center', 
-           color: 'black' 
-        }}>
-           <span className="text-[1px] leading-none opacity-50">.</span> 
-    </div>
+      
+      {/* Footer Padding untuk Printer Thermal agar tidak terpotong saat sobek kertas */}
+      <div className="h-8"></div>
     </div>
   );
 });
