@@ -112,7 +112,7 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
       </div>
       
       {/* Footer Padding untuk Printer Thermal agar tidak terpotong saat sobek kertas */}
-      <div className="h-8"></div>
+      <div className="h-16 w-full"></div>
     </div>
   );
 });
