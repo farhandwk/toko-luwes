@@ -22,6 +22,7 @@ import {
   BarChart3, FolderTree, ChartArea // Import Icon Chart
 } from 'lucide-react';
 import { Separator } from './ui/separator';
+import InstallPWA from './InstallPWA';
 
 interface MobileSidebarProps {
   onRefresh? : () => void;
@@ -104,6 +105,10 @@ export default function MobileSidebar({ onRefresh }: MobileSidebarProps) {
                     <RefreshCw className="mr-3 h-5 w-5" /> 
                     Refresh Data
                 </Button>
+            </SheetClose>
+
+            <SheetClose asChild>
+                <InstallPWA/>
             </SheetClose>
             
         </div>

@@ -51,12 +51,12 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match semua request kecuali:
-     * - api (api routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico, logo, dll (public files)
+     * Berikan izin akses bebas (skip middleware) untuk:
+     * 1. api (API routes)
+     * 2. _next/static (static files)
+     * 3. _next/image (image optimization files)
+     * 4. manifest.json, favicon.ico, logo (PWA files)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|manifest.json|favicon.ico|logo|.*\\.png$).*)',
   ],
-}
+};
