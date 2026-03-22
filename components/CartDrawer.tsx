@@ -54,6 +54,10 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
   const [lastCashReceived, setLastCashReceived] = useState(0);
   const [lastChange, setLastChange] = useState(0);
 
+  const isAndroid = () => {
+  return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+};
+
   // Hitung kembalian
   const change = (paymentMethod === "Cash" && typeof cashReceived === 'number') ? cashReceived - finalTotal : 0;
 
@@ -366,16 +370,35 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
           <DialogContent className="sm:max-w-md w-[90%] rounded-xl">
             <DialogHeader><DialogTitle className="text-center">Transaksi Berhasil!</DialogTitle></DialogHeader>
-            <div className="space-y-3 py-2">
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                    <Label className="text-xs text-slate-500 mb-1.5 block font-bold uppercase">Nomor WhatsApp Pelanggan</Label>
-                    <div className="flex gap-2"><Input placeholder="08xxxxxxxxxx" value={manualPhone} onChange={(e) => setManualPhone(e.target.value)} /><Button variant="outline" onClick={handleDownloadImage} title="Download"><Download className="h-4 w-4" /></Button></div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                    <Button variant="outline" className="h-16 flex flex-col hidden lg:flex" onClick={() => handlePrintPC()}><Printer className="h-5 w-5" /><span className="text-xs">Cetak (USB)</span></Button>
-                    <Button variant="outline" className="h-16 flex flex-col lg:hidden" onClick={handlePrintMobile}><Printer className="h-5 w-5" /><span className="text-xs">Cetak (BT)</span></Button>
-                    <Button className="h-16 flex flex-col bg-green-600 col-span-2 md:col-span-1" onClick={handleOpenWhatsApp}><Share2 className="h-5 w-5" /><span className="text-xs text-white">Kirim WA</span></Button>
-                </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+            {/* Jika Android, utamakan RawBT (BT), jika bukan (PC/iOS) gunakan USB/System Print */}
+            {isAndroid() ? (
+                <Button 
+                variant="outline" 
+                className="h-16 flex flex-col col-span-1" 
+                onClick={handlePrintMobile}
+                >
+                <Printer className="h-5 w-5 text-blue-600" />
+                <span className="text-xs">Cetak Struk (BT)</span>
+                </Button>
+            ) : (
+                <Button 
+                variant="outline" 
+                className="h-16 flex flex-col col-span-1" 
+                onClick={() => handlePrintPC()}
+                >
+                <Printer className="h-5 w-5" />
+                <span className="text-xs">Cetak Struk (USB)</span>
+                </Button>
+            )}
+
+            <Button 
+                className="h-16 flex flex-col bg-green-600 col-span-1" 
+                onClick={handleOpenWhatsApp}
+            >
+                <Share2 className="h-5 w-5" />
+                <span className="text-xs text-white">Kirim WA</span>
+            </Button>
             </div>
             <DialogFooter className="sm:justify-center"><Button variant="ghost" onClick={() => { setShowSuccessDialog(false); setIsOpen(false); }}>Tutup</Button></DialogFooter>
         </DialogContent>
