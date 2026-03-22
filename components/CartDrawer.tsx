@@ -175,7 +175,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
         setDiscount('');
         if (onCheckoutSuccess) onCheckoutSuccess();
       } else { throw new Error(result.error); }
-    } catch (error) { console.error(error); toast.error("Gagal Checkout"); } finally { setIsLoading(false); }
+    } catch (error: any) { console.error(error); toast.error(error.message); } finally { setIsLoading(false); }
   };
 
   if (!isMounted) return <div className={className}></div>;

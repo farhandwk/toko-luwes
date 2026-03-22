@@ -164,12 +164,14 @@ export default function AdminProducts() {
     if (!selectedProduct || typeof restockAmount !== 'number' || restockAmount <= 0) {
         toast.error("Jumlah stok tidak valid"); return;
     }
-    const newStock = (selectedProduct.stock || 0) + restockAmount;
     try {
         const res = await fetch('/api/products', {
-            method: 'PUT',
+            method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...selectedProduct, stock: newStock }),
+            body: JSON.stringify({ 
+              row_id: selectedProduct.id,
+              amount: restockAmount
+             }),
         });
         if (res.ok) {
             toast.success(`Stok bertambah +${restockAmount}.`);

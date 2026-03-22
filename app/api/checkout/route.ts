@@ -14,9 +14,11 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { items, total_price, payment_method, date, cash_amount, change_amount } = body;
 
-    if (!items || items.length === 0) return NextResponse.json({ error: "Keranjang Kosong!" }, { status: 400 });
+    if (!items || items.length === 0) {
+      return NextResponse.json({ error: "Keranjang Kosong!" }, { status: 400 });
+    }
 
-    // 1. Snapshot Items
+    // 1. Siapkan Snapshot Items (Sama seperti sebelumnya)
     const slimItems = items.map((item: any) => ({
       id: item.id,
       name: item.name,
@@ -26,40 +28,32 @@ export async function POST(req: Request) {
       is_decimal: item.is_decimal || false
     }));
 
-    // 2. Update Stok (DIPERBAIKI)
-    for (const item of items) {
-      const { data: productData } = await supabaseAdmin
-        .from('products')
-        .select('stock')
-        .eq('id', item.id)
-        .single();
+    const transactionId = `TRX-${Date.now()}`;
+    const formattedDate = date || new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
 
-      const currentStock = Number(productData?.stock || 0);
-      const newStock = Number((currentStock - item.qty).toFixed(2));
+    // 2. EKSEKUSI RPC (The Magic Happens Here)
+    // Kita kirim semua data ke database dalam satu kali panggil
+    const { error: rpcError } = await supabaseAdmin.rpc('process_checkout_v2', {
+      p_items: slimItems,
+      p_trx_id: transactionId,
+      p_total_price: Number(total_price) || 0,
+      p_payment_method: payment_method,
+      p_cash_amount: Number(cash_amount) || 0,
+      p_change_amount: Number(change_amount) || 0,
+      p_date: formattedDate
+    });
 
-      await supabaseAdmin
-        .from('products')
-        .update({ stock: newStock })
-        .eq('id', item.id); // <-- SUDAH DIPERBAIKI (TIDAK ADA TYPO 'id:')
+    // Jika stok tidak cukup, RPC akan melempar exception dan ditangkap di sini
+    if (rpcError) {
+      return NextResponse.json({ error: rpcError.message }, { status: 400 });
     }
 
-    // 3. Simpan Transaksi
-    const transactionId = `TRX-${Date.now()}`;
-    const newTransaction = {
-      id: transactionId,
-      date: date || new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
-      items: slimItems, 
-      total_price: Number(total_price) || 0,       // Gunakan variabel total_price
-      payment_method: payment_method || 'Cash',    // Gunakan variabel payment_method
-      cash_amount: Number(cash_amount) || 0,
-      change_amount: Number(change_amount) || 0,
-      inserted_at: new Date().toISOString()
-    };
+    return NextResponse.json({ 
+      success: true, 
+      transactionId, 
+      newTransaction: { id: transactionId, items: slimItems, total_price } 
+    });
 
-    const { error: trxError } = await supabaseAdmin.from('transactions').insert([newTransaction]);
-    if (trxError) throw trxError;
-
-    return NextResponse.json({ success: true, transactionId, newTransaction });
   } catch (error: any) {
     console.error('Checkout Error:', error);
     return NextResponse.json({ error: 'Gagal memproses transaksi: ' + error.message }, { status: 500 });
