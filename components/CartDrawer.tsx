@@ -372,8 +372,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckoutSuccess, className })
                     <div className="flex gap-2"><Input placeholder="08xxxxxxxxxx" value={manualPhone} onChange={(e) => setManualPhone(e.target.value)} /><Button variant="outline" onClick={handleDownloadImage} title="Download"><Download className="h-4 w-4" /></Button></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 pt-2">
-                    <Button variant="outline" className="h-16 flex flex-col hidden md:flex" onClick={() => handlePrintPC()}><Printer className="h-5 w-5" /><span className="text-xs">Cetak (USB)</span></Button>
-                    <Button variant="outline" className="h-16 flex flex-col md:hidden" onClick={handlePrintMobile}><Printer className="h-5 w-5" /><span className="text-xs">Cetak (BT)</span></Button>
+                    <Button variant="outline" className="h-16 flex flex-col hidden lg:flex" onClick={() => handlePrintPC()}><Printer className="h-5 w-5" /><span className="text-xs">Cetak (USB)</span></Button>
+                    <Button variant="outline" className="h-16 flex flex-col lg:hidden" onClick={handlePrintMobile}><Printer className="h-5 w-5" /><span className="text-xs">Cetak (BT)</span></Button>
                     <Button className="h-16 flex flex-col bg-green-600 col-span-2 md:col-span-1" onClick={handleOpenWhatsApp}><Share2 className="h-5 w-5" /><span className="text-xs text-white">Kirim WA</span></Button>
                 </div>
             </div>
