@@ -23,7 +23,7 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
       className="bg-white text-black font-mono mx-auto leading-tight" 
       style={{ 
         width: '58mm', 
-        padding: '5px 5px', // Padding sedikit diperlebar agar tidak terpotong printer
+        padding: '1px 5px', // Padding sedikit diperlebar agar tidak terpotong printer
         fontFamily: "monospace", // Gunakan monospace murni untuk kesan struk
         fontSize: '12px',
         fontWeight: '600',
@@ -112,7 +112,7 @@ const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>((props, ref) => {
       </div>
       
       {/* Footer Padding untuk Printer Thermal agar tidak terpotong saat sobek kertas */}
-      <div className="h-16 w-full"></div>
+      <div className="h-2 w-full"></div>
     </div>
   );
 });
